@@ -764,6 +764,74 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
+                "authorFlairBackgroundColor": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY color\n* If `false` then passes if NO color\n* If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairCssClass": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY class\n* If `false` then passes if NO class\n* If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairTemplateId": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then template id is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairText": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
                 "createdOn": {
                     "anyOf": [
                         {
@@ -1717,18 +1785,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -1766,6 +1834,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",
@@ -1813,14 +1884,6 @@
         "ModNoteActionJson": {
             "description": "Add a Toolbox User Note to the Author of this Activity",
             "properties": {
-                "allowDuplicate": {
-                    "default": false,
-                    "description": "Add Note even if a Note already exists for this Activity",
-                    "examples": [
-                        false
-                    ],
-                    "type": "boolean"
-                },
                 "authorIs": {
                     "anyOf": [
                         {
@@ -1870,6 +1933,21 @@
                         true
                     ],
                     "type": "boolean"
+                },
+                "existingNoteCheck": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/ModNoteCriteria"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "default": true,
+                    "description": "Check if there is an existing Note matching some criteria before adding the Note.\n\nIf this check passes then the Note is added. The value may be a boolean or ModNoteCriteria.\n\nBoolean convenience:\n\n* If `true` or undefined then CM generates a ModNoteCriteria that passes only if there is NO existing note matching note criteria\n* If `false` then no check is performed and Note is always added",
+                    "examples": [
+                        true
+                    ]
                 },
                 "itemIs": {
                     "anyOf": [
@@ -1943,18 +2021,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -2012,6 +2090,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",
@@ -2522,6 +2603,74 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
+                "authorFlairBackgroundColor": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY color\n* If `false` then passes if NO color\n* If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairCssClass": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY class\n* If `false` then passes if NO class\n* If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairTemplateId": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then template id is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairText": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
                 "createdOn": {
                     "anyOf": [
                         {
@@ -2586,6 +2735,23 @@
                 "is_self": {
                     "type": "boolean"
                 },
+                "link_flair_background_color": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY color\n* If `false` then passes if NO color\n* If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes."
+                },
                 "link_flair_css_class": {
                     "anyOf": [
                         {
@@ -2601,7 +2767,7 @@
                             ]
                         }
                     ],
-                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css"
+                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css\n* If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
                 },
                 "link_flair_text": {
                     "anyOf": [
@@ -2618,7 +2784,7 @@
                             ]
                         }
                     ],
-                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text"
+                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
                 },
                 "locked": {
                     "type": "boolean"
@@ -2806,7 +2972,7 @@
             "properties": {
                 "allowDuplicate": {
                     "default": false,
-                    "description": "Add Note even if a Note already exists for this Activity",
+                    "description": "Add Note even if a Note already exists for this Activity\n\nUSE `existingNoteCheck` INSTEAD",
                     "examples": [
                         false
                     ],
@@ -2861,6 +3027,21 @@
                         true
                     ],
                     "type": "boolean"
+                },
+                "existingNoteCheck": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/UserNoteCriteria"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "default": true,
+                    "description": "Check if there is an existing Note matching some criteria before adding the Note.\n\nIf this check passes then the Note is added. The value may be a boolean or UserNoteCriteria.\n\nBoolean convenience:\n\n* If `true` or undefined then CM generates a UserNoteCriteria that passes only if there is NO existing note matching note criteria\n* If `false` then no check is performed and Note is always added",
+                    "examples": [
+                        true
+                    ]
                 },
                 "itemIs": {
                     "anyOf": [
@@ -2928,6 +3109,23 @@
                     ],
                     "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<duration>in\\s+\\d+\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\\s*(?<extra>asc.*|desc.*)*$",
                     "type": "string"
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The content of the Note to search For.\n\n* Can be a single string or list of strings to search for. Each string will be searched for case-insensitive, as a subset of note content.\n* Can also be Regular Expression if wrapped in forward slashes IE '\\/test.*\\/i'"
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",

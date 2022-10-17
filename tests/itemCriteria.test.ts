@@ -16,6 +16,7 @@ import Snoowrap from "snoowrap";
 import {getResource, getSnoowrap, getSubreddit, sampleActivity} from "./testFactory";
 import {Subreddit as SubredditEntity} from "../src/Common/Entities/Subreddit";
 import {Activity} from '../src/Common/Entities/Activity';
+import {cmToSnoowrapActivityMap} from "../src/Common/Infrastructure/Filters/FilterCriteria";
 
 dayjs.extend(dduration);
 dayjs.extend(utc);
@@ -229,49 +230,98 @@ describe('Item Criteria', function () {
             }, snoowrap, false), {upvoteRatio: '> 33'}, NoopLogger, true)).passed);
         });
 
-        it('Should detect specific link flair template', async function () {
-            assert.isTrue((await resource.isItem(new Submission({
-                link_flair_template_id: 'test',
-            }, snoowrap, false), {flairTemplate: 'test'}, NoopLogger, true)).passed);
-            assert.isTrue((await resource.isItem(new Submission({
-                link_flair_template_id: 'test',
-            }, snoowrap, false), {flairTemplate: ['foo','test']}, NoopLogger, true)).passed);
-            assert.isFalse((await resource.isItem(new Submission({
-                link_flair_template_id: 'test',
-            }, snoowrap, false), {flairTemplate: ['foo']}, NoopLogger, true)).passed);
-        });
-        it('Should detect any link flair template', async function () {
-            assert.isTrue((await resource.isItem(new Submission({
-                link_flair_template_id: 'test',
-            }, snoowrap, false), {flairTemplate: true}, NoopLogger, true)).passed);
-        });
-        it('Should detect no link flair template', async function () {
-            assert.isTrue((await resource.isItem(new Submission({
-                link_flair_template_id: null
-            }, snoowrap, false), {flairTemplate: false}, NoopLogger, true)).passed);
-        });
+        for(const prop of ['link_flair_text', 'link_flair_css_class', 'authorFlairCssClass', 'authorFlairTemplateId', 'authorFlairText', 'flairTemplate']) {
+            const activityPropName = cmToSnoowrapActivityMap[prop] ?? prop;
 
-        for(const prop of ['link_flair_text', 'link_flair_css_class']) {
-            it(`Should detect specific ${prop}`, async function () {
+            it(`Should detect specific ${prop} as single string`, async function () {
                 assert.isTrue((await resource.isItem(new Submission({
-                    [prop]: 'test',
+                    [activityPropName]: 'test',
                 }, snoowrap, false), {[prop]: 'test'}, NoopLogger, true)).passed);
+            });
+            it(`Should detect specific ${prop} from array of string`, async function () {
                 assert.isTrue((await resource.isItem(new Submission({
-                    [prop]: 'test',
+                    [activityPropName]: 'test',
                 }, snoowrap, false), {[prop]: ['foo','test']}, NoopLogger, true)).passed);
+            });
+            it(`Should detect specific ${prop} is not in criteria`, async function () {
                 assert.isFalse((await resource.isItem(new Submission({
-                    [prop]: 'test',
+                    [activityPropName]: 'test',
                 }, snoowrap, false), {[prop]: ['foo']}, NoopLogger, true)).passed);
             });
             it(`Should detect any ${prop}`, async function () {
                 assert.isTrue((await resource.isItem(new Submission({
-                    [prop]: 'test',
+                    [activityPropName]: 'test',
                 }, snoowrap, false), {[prop]: true}, NoopLogger, true)).passed);
             });
             it(`Should detect no ${prop}`, async function () {
                 assert.isTrue((await resource.isItem(new Submission({
-                    [prop]: null
+                    [activityPropName]: null
                 }, snoowrap, false), {[prop]: false}, NoopLogger, true)).passed);
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: ''
+                }, snoowrap, false), {[prop]: false}, NoopLogger, true)).passed);
+                assert.isFalse((await resource.isItem(new Submission({
+                    [activityPropName]: ''
+                }, snoowrap, false), {[prop]: 'foo'}, NoopLogger, true)).passed);
+            });
+            it(`Should detect ${prop} as Regular Expression`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: 'test'
+                }, snoowrap, false), {[prop]: '/te.*/'}, NoopLogger, true)).passed);
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: 'test'
+                }, snoowrap, false), {[prop]: ['foo', '/t.*/']}, NoopLogger, true)).passed);
+            });
+        }
+
+        for(const prop of ['authorFlairBackgroundColor', 'link_flair_background_color']) {
+            const activityPropName = cmToSnoowrapActivityMap[prop] ?? prop;
+
+            it(`Should detect specific ${prop} as single string`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: '#400080',
+                }, snoowrap, false), {[prop]: '#400080'}, NoopLogger, true)).passed);
+            });
+            it(`Should detect specific ${prop} from array of string`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: '#400080',
+                }, snoowrap, false), {[prop]: ['#903480','#400080']}, NoopLogger, true)).passed);
+            });
+            it(`Should detect specific ${prop} is not in criteria`, async function () {
+                assert.isFalse((await resource.isItem(new Submission({
+                    [activityPropName]: '#400080',
+                }, snoowrap, false), {[prop]: ['#903480']}, NoopLogger, true)).passed);
+            });
+            it(`Should detect any ${prop}`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: '#400080',
+                }, snoowrap, false), {[prop]: true}, NoopLogger, true)).passed);
+            });
+            it(`Should detect no ${prop}`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: null
+                }, snoowrap, false), {[prop]: false}, NoopLogger, true)).passed);
+            });
+            it(`Should detect ${prop} and remove # prefix`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: '#400080'
+                }, snoowrap, false), {[prop]: '400080'}, NoopLogger, true)).passed);
+            });
+            it(`Should detect ${prop} as Regular Expression`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: '#400080'
+                }, snoowrap, false), {[prop]: '/#400.*/'}, NoopLogger, true)).passed);
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: '#400080'
+                }, snoowrap, false), {[prop]: ['#903480', '/400.*/']}, NoopLogger, true)).passed);
+            });
+        }
+
+        for(const prop of ['link_flair_text', 'link_flair_css_class', 'flairTemplate', 'link_flair_background_color']) {
+            it(`Should PASS submission criteria '${prop}' with a reason when Activity is a Comment`, async function () {
+                const result = await resource.isItem(new Comment({}, snoowrap, false), {[prop]: true}, NoopLogger, true);
+                assert.isTrue(result.passed);
+                assert.equal(result.propertyResults[0].reason, `Cannot test for ${prop} on Comment`)
             });
         }
 

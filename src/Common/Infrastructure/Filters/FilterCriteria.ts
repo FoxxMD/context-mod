@@ -6,9 +6,10 @@ import {
     ModeratorNames, ModActionType,
     ModUserNoteLabel, RelativeDateTimeMatch
 } from "../Atomic";
-import {ActivityType} from "../Reddit";
+import {ActivityType, MaybeActivityType} from "../Reddit";
 import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
 import {parseStringToRegexOrLiteralSearch} from "../../../util";
+import { Submission, Comment } from "snoowrap";
 
 /**
  * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
@@ -118,17 +119,49 @@ export interface UserNoteCriteria extends UserSubredditHistoryCriteria {
      * @examples ["spamwarn"]
      * */
     type: string;
+    /**
+     * The content of the Note to search For.
+     *
+     * * Can be a single string or list of strings to search for. Each string will be searched for case-insensitive, as a subset of note content.
+     * * Can also be Regular Expression if wrapped in forward slashes IE '\/test.*\/i'
+     * */
+    note?: string | string[]
+    /*
+    * Does this note link to the currently processing Activity?
+    * */
+    referencesCurrentActivity?: boolean
+}
+
+export interface FullUserNoteCriteria extends Omit<UserNoteCriteria, 'note'> {
+    note?: RegExp[]
+}
+
+export const toFullUserNoteCriteria = (val: UserNoteCriteria): FullUserNoteCriteria => {
+    const {note} = val;
+    let notesVal = undefined;
+    if (note !== undefined) {
+        const notesArr = Array.isArray(note) ? note : [note];
+        notesVal = notesArr.map(x => parseStringToRegexOrLiteralSearch(x));
+    }
+    return {
+        ...val,
+        note: notesVal
+    }
 }
 
 export interface ModActionCriteria extends UserSubredditHistoryCriteria {
     type?: ModActionType | ModActionType[]
-    activityType?: ActivityType | ActivityType[]
+    activityType?: MaybeActivityType | MaybeActivityType[]
+    referencesCurrentActivity?: boolean
 }
 
 export interface FullModActionCriteria extends Omit<ModActionCriteria, 'count'> {
     type?: ModActionType[]
     count?: GenericComparison
-    activityType?: ActivityType[]
+    /*
+    * Does this action/note link to the currently processing Activity?
+    * */
+    activityType?: MaybeActivityType[]
 }
 
 export interface ModNoteCriteria extends ModActionCriteria {
@@ -138,6 +171,12 @@ export interface ModNoteCriteria extends ModActionCriteria {
 
 export interface FullModNoteCriteria extends FullModActionCriteria, Omit<ModNoteCriteria, 'note' | 'count' | 'type' | 'activityType'> {
     noteType?: ModUserNoteLabel[]
+    /**
+     * The content of the Note to search For.
+     *
+     * * Can be a single string or list of strings to search for. Each string will be searched for case-insensitive, as a subset of note content.
+     * * Can also be Regular Expression if wrapped in forward slashes IE '\/test.*\/i'
+     * */
     note?: RegExp[]
 }
 
@@ -167,6 +206,7 @@ export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria
                 break;
             case 'activityType':
             case 'noteType':
+            case 'referencesCurrentActivity':
                 acc[k] = rawVal;
                 break;
             case 'note':
@@ -219,6 +259,7 @@ export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria =>
                 break;
             case 'activityType':
             case 'type':
+            case 'referencesCurrentActivity':
                 acc[k as keyof FullModLogCriteria] = rawVal;
                 break;
             case 'action':
@@ -485,6 +526,33 @@ export interface ActivityState {
      *
      * */
     source?: string | string[]
+
+    /**
+     * * If `true` then passes if ANY flair
+     * * If `false` then passes if NO flair
+     * * If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairText?: boolean | string | string[]
+    /**
+     * * If `true` then passes if ANY flair
+     * * If `false` then passes if NO flair
+     * * If string or list of strings then template id is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairTemplateId?: boolean | string | string[]
+
+    /**
+     * * If `true` then passes if ANY class
+     * * If `false` then passes if NO class
+     * * If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairCssClass?: boolean | string | string[]
+
+    /**
+     * * If `true` then passes if ANY color
+     * * If `false` then passes if NO color
+     * * If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairBackgroundColor?: boolean | string | string[]
 }
 
 /**
@@ -507,13 +575,22 @@ export interface SubmissionState extends ActivityState {
     /**
      * * If `true` then passes if flair has ANY text
      * * If `false` then passes if flair has NO text
+     * * If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
      * */
     link_flair_text?: boolean | string | string[]
     /**
      * * If `true` then passes if flair has ANY css
      * * If `false` then passes if flair has NO css
+     * * If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
      * */
     link_flair_css_class?: boolean | string | string[]
+
+    /**
+     * * If `true` then passes if ANY color
+     * * If `false` then passes if NO color
+     * * If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes.
+     * */
+    link_flair_background_color?: boolean | string | string[]
     /**
      * * If `true` then passes if there is ANY flair template id
      * * If `false` then passes if there is NO flair template id
@@ -535,6 +612,16 @@ export interface SubmissionState extends ActivityState {
      * * 45 => greater than or equal to 45% upvoted
      * */
     upvoteRatio?: number | CompareValue
+}
+
+export const cmToSnoowrapActivityMap: Record<string, keyof (Submission & Comment)> = {
+    authorFlairText: 'author_flair_text',
+    flairText: 'author_flair_text',
+    authorFlairTemplateId: 'author_flair_template_id',
+    authorFlairCssClass: 'author_flair_css_class',
+    authorFlairBackgroundColor: 'author_flair_background_color',
+    flairTemplate: 'link_flair_template_id',
+    flairCssClass: 'author_flair_css_class',
 }
 
 export const cmActivityProperties = ['submissionState', 'score', 'reports', 'removed', 'deleted', 'filtered', 'age', 'title'];

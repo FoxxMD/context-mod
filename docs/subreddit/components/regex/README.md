@@ -11,12 +11,12 @@ Which can then be used in conjunction with a [`window`](https://github.com/FoxxM
 
 ### Examples
 
-* Trigger if regex matches against the current activity - [YAML](/docs/subreddit/componentscomponents/regex/matchAnyCurrentActivity.yaml) | [JSON](/docs/subreddit/componentscomponents/regex/matchAnyCurrentActivity.json5)
-* Trigger if regex matches 5 times against the current activity - [YAML](/docs/subreddit/componentscomponents/regex/matchThresholdCurrentActivity.yaml) | [JSON](/docs/subreddit/componentscomponents/regex/matchThresholdCurrentActivity.json5)
-* Trigger if regex matches against any part of a Submission - [YAML](/docs/subreddit/componentscomponents/regex/matchSubmissionParts.yaml) | [JSON](/docs/subreddit/componentscomponents/regex/matchSubmissionParts.json5)
-* Trigger if regex matches any of Author's last 10 activities - [YAML](/docs/subreddit/componentscomponents/regex/matchHistoryActivity.yaml) | [JSON](/docs/subreddit/componentscomponents/regex/matchHistoryActivity.json5)
-* Trigger if regex matches at least 3 of Author's last 10 activities - [YAML](/docs/subreddit/componentscomponents/regex/matchActivityThresholdHistory.json5) | [JSON](/docs/subreddit/componentscomponents/regex/matchActivityThresholdHistory.json5)
-* Trigger if there are 5 regex matches in the Author's last 10 activities - [YAML](/docs/subreddit/componentscomponents/regex/matchTotalHistoryActivity.yaml) | [JSON](/docs/subreddit/componentscomponents/regex/matchTotalHistoryActivity.json5) 
-* Trigger if there are 5 regex matches in the Author's last 10 comments - [YAML](/docs/subreddit/componentscomponents/regex/matchSubsetHistoryActivity.yaml) | [JSON](/docs/subreddit/componentscomponents/regex/matchSubsetHistoryActivity.json5)
-* Remove comments that are spamming discord links - [YAML](/docs/subreddit/componentscomponents/regex/removeDiscordSpam.yaml) | [JSON](/docs/subreddit/componentscomponents/regex/removeDiscordSpam.json5)
+* Trigger if regex matches against the current activity - [YAML](/docs/subreddit/components/regex/matchAnyCurrentActivity.yaml) | [JSON](/docs/subreddit/components/regex/matchAnyCurrentActivity.json5)
+* Trigger if regex matches 5 times against the current activity - [YAML](/docs/subreddit/components/regex/matchThresholdCurrentActivity.yaml) | [JSON](/docs/subreddit/components/regex/matchThresholdCurrentActivity.json5)
+* Trigger if regex matches against any part of a Submission - [YAML](/docs/subreddit/components/regex/matchSubmissionParts.yaml) | [JSON](/docs/subreddit/components/regex/matchSubmissionParts.json5)
+* Trigger if regex matches any of Author's last 10 activities - [YAML](/docs/subreddit/components/regex/matchHistoryActivity.yaml) | [JSON](/docs/subreddit/components/regex/matchHistoryActivity.json5)
+* Trigger if regex matches at least 3 of Author's last 10 activities - [YAML](/docs/subreddit/components/regex/matchActivityThresholdHistory.json5) | [JSON](/docs/subreddit/components/regex/matchActivityThresholdHistory.json5)
+* Trigger if there are 5 regex matches in the Author's last 10 activities - [YAML](/docs/subreddit/components/regex/matchTotalHistoryActivity.yaml) | [JSON](/docs/subreddit/components/regex/matchTotalHistoryActivity.json5) 
+* Trigger if there are 5 regex matches in the Author's last 10 comments - [YAML](/docs/subreddit/components/regex/matchSubsetHistoryActivity.yaml) | [JSON](/docs/subreddit/components/regex/matchSubsetHistoryActivity.json5)
+* Remove comments that are spamming discord links - [YAML](/docs/subreddit/components/regex/removeDiscordSpam.yaml) | [JSON](/docs/subreddit/components/regex/removeDiscordSpam.json5)
   * Differs from just using automod because this config can allow one-off/organic links from users who DO NOT spam discord links but will still remove the comment if the user is spamming them

@@ -2489,18 +2489,22 @@ export const mergeFilters = (objectConfig: RunnableBaseJson, filterDefs: FilterC
     let derivedAuthorIs: AuthorOptions = buildFilter(authorIsDefault);
     if (authorIsBehavior === 'merge') {
         derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
-    } else if (Object.keys(authorIs).length > 0) {
+    } else if (!filterIsEmpty(authorIs)) {
         derivedAuthorIs = authorIs;
     }
 
     let derivedItemIs: ItemOptions = buildFilter(itemIsDefault);
     if (itemIsBehavior === 'merge') {
         derivedItemIs = merge.all([itemIs, itemIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
-    } else if (Object.keys(itemIs).length > 0) {
+    } else if (!filterIsEmpty(itemIs)) {
         derivedItemIs = itemIs;
     }
 
     return [derivedAuthorIs, derivedItemIs];
+}
+
+export const filterIsEmpty = (obj: FilterOptions<any>): boolean => {
+    return (obj.include === undefined || obj.include.length === 0) && (obj.exclude === undefined || obj.exclude.length === 0);
 }
 
 export const buildFilter = (filterVal: MinimalOrFullMaybeAnonymousFilter<AuthorCriteria | TypedActivityState | ActivityState>): FilterOptions<AuthorCriteria | TypedActivityState | ActivityState> => {
@@ -2606,28 +2610,7 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState 
             criteria.description = Array.isArray(criteria.description) ? criteria.description : [criteria.description];
         }
         if(criteria.modActions !== undefined) {
-            criteria.modActions.map((x, index) => {
-                const common = {
-                    ...x,
-                    type: x.type === undefined ? undefined : (Array.isArray(x.type) ? x.type : [x.type])
-                }
-                if(asModNoteCriteria(x)) {
-                    return {
-                        ...common,
-                        noteType: x.noteType === undefined ? undefined : (Array.isArray(x.noteType) ? x.noteType : [x.noteType]),
-                        note: x.note === undefined ? undefined : (Array.isArray(x.note) ? x.note : [x.note]),
-                    }
-                } else if(asModLogCriteria(x)) {
-                    return {
-                        ...common,
-                        action: x.action === undefined ? undefined : (Array.isArray(x.action) ? x.action : [x.action]),
-                        details: x.details === undefined ? undefined : (Array.isArray(x.details) ? x.details : [x.details]),
-                        description: x.description === undefined ? undefined : (Array.isArray(x.description) ? x.description : [x.description]),
-                        activityType: x.activityType === undefined ? undefined : (Array.isArray(x.activityType) ? x.activityType : [x.activityType]),
-                    }
-                }
-                return common;
-            })
+            criteria.modActions.map((x, index) => normalizeModActionCriteria(x));
         }
     }
 
@@ -2635,6 +2618,29 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState 
         name,
         criteria
     };
+}
+
+export const normalizeModActionCriteria = (x: (ModNoteCriteria | ModLogCriteria)): (ModNoteCriteria | ModLogCriteria) => {
+    const common = {
+        ...x,
+        type: x.type === undefined ? undefined : (Array.isArray(x.type) ? x.type : [x.type])
+    }
+    if(asModNoteCriteria(x)) {
+        return {
+            ...common,
+            noteType: x.noteType === undefined ? undefined : (Array.isArray(x.noteType) ? x.noteType : [x.noteType]),
+            note: x.note === undefined ? undefined : (Array.isArray(x.note) ? x.note : [x.note]),
+        }
+    } else if(asModLogCriteria(x)) {
+        return {
+            ...common,
+            action: x.action === undefined ? undefined : (Array.isArray(x.action) ? x.action : [x.action]),
+            details: x.details === undefined ? undefined : (Array.isArray(x.details) ? x.details : [x.details]),
+            description: x.description === undefined ? undefined : (Array.isArray(x.description) ? x.description : [x.description]),
+            activityType: x.activityType === undefined ? undefined : (Array.isArray(x.activityType) ? x.activityType : [x.activityType]),
+        }
+    }
+    return common;
 }
 
 export const asNamedCriteria = <T>(val: MaybeAnonymousCriteria<T> | undefined): val is NamedCriteria<T> => {

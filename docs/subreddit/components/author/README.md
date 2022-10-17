@@ -9,7 +9,7 @@ The **Author** rule triggers if any [AuthorCriteria](https://json-schema.app/vie
 * author's subreddit flair text
 * author's subreddit flair css
 * author's subreddit mod status
-* [Toolbox User Notes](/docs/subreddit/componentscomponents/userNotes)
+* [Toolbox User Notes](/docs/subreddit/components/userNotes)
 
 The Author **Rule** is best used in conjunction with other Rules to short-circuit a Check based on who the Author is. It is easier to use a Rule to do this then to write **author filters** for every Rule (and makes Rules more re-useable).
 
@@ -18,10 +18,10 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorRule
 ### Examples
 
 * Basic examples
-    * Flair new user Submission [YAML](/docs/subreddit/componentscomponents/author/flairNewUserSubmission.yaml) | [JSON](/docs/subreddit/componentscomponents/author/flairNewUserSubmission.json5) - If the Author does not have the `vet` flair then flair the Submission with `New User`
-    * Flair vetted user Submission [YAML](/docs/subreddit/componentscomponents/author/flairNewUserSubmission.yaml) | [JSON](/docs/subreddit/componentscomponents/author/flairNewUserSubmission.json5) - If the Author does have the `vet` flair then flair the Submission with `Vetted`
+    * Flair new user Submission [YAML](/docs/subreddit/components/author/flairNewUserSubmission.yaml) | [JSON](/docs/subreddit/components/author/flairNewUserSubmission.json5) - If the Author does not have the `vet` flair then flair the Submission with `New User`
+    * Flair vetted user Submission [YAML](/docs/subreddit/components/author/flairNewUserSubmission.yaml) | [JSON](/docs/subreddit/components/author/flairNewUserSubmission.json5) - If the Author does have the `vet` flair then flair the Submission with `Vetted`
 * Used with other Rules
-    * Ignore vetted user [YAML](/docs/subreddit/componentscomponents/author/flairNewUserSubmission.yaml) | [JSON](/docs/subreddit/componentscomponents/author/flairNewUserSubmission.json5) - Short-circuit the Check if the Author has the `vet` flair
+    * Ignore vetted user [YAML](/docs/subreddit/components/author/flairNewUserSubmission.yaml) | [JSON](/docs/subreddit/components/author/flairNewUserSubmission.json5) - Short-circuit the Check if the Author has the `vet` flair
     
 ## Filter
 
@@ -35,7 +35,7 @@ All **Rules** and **Checks** have an optional `authorIs` property that takes an 
 
 ### Examples
 
-* Skip recent activity check based on author [YAML](/docs/subreddit/componentscomponents/author/authorFilter.yaml) | [JSON](/docs/subreddit/componentscomponents/author/authorFilter.json5) - Skip a Recent Activity check for a set of subreddits if the Author of the Submission has any set of flairs.
+* Skip recent activity check based on author [YAML](/docs/subreddit/components/author/authorFilter.yaml) | [JSON](/docs/subreddit/components/author/authorFilter.json5) - Skip a Recent Activity check for a set of subreddits if the Author of the Submission has any set of flairs.
 
 ## Flair users and submissions
 
@@ -45,4 +45,4 @@ Consult [User Flair schema](https://json-schema.app/view/%23%2Fdefinitions%2FUse
 
 ### Examples
 
-* OnlyFans submissions [YAML](/docs/subreddit/componentscomponents/author/onlyfansFlair.yaml) | [JSON](/docs/subreddit/componentscomponents/author/onlyfansFlair.json5) - Check whether submitter has typical OF keywords in their profile and flair both author + submission accordingly.
+* OnlyFans submissions [YAML](/docs/subreddit/components/author/onlyfansFlair.yaml) | [JSON](/docs/subreddit/components/author/onlyfansFlair.json5) - Check whether submitter has typical OF keywords in their profile and flair both author + submission accordingly.

@@ -112,9 +112,20 @@ import cloneDeep from "lodash/cloneDeep";
 import {
     asModLogCriteria,
     asModNoteCriteria,
-    AuthorCriteria, CommentState, ModLogCriteria, ModNoteCriteria, orderedAuthorCriteriaProps, RequiredAuthorCrit,
-    StrongSubredditCriteria, SubmissionState,
-    SubredditCriteria, toFullModLogCriteria, toFullModNoteCriteria, TypedActivityState, TypedActivityStates,
+    AuthorCriteria,
+    cmToSnoowrapActivityMap,
+    CommentState,
+    ModLogCriteria,
+    ModNoteCriteria,
+    orderedAuthorCriteriaProps,
+    RequiredAuthorCrit,
+    StrongSubredditCriteria,
+    SubmissionState,
+    SubredditCriteria,
+    toFullModLogCriteria,
+    toFullModNoteCriteria, toFullUserNoteCriteria,
+    TypedActivityState,
+    TypedActivityStates,
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
@@ -144,7 +155,7 @@ import {
 
     ActivityType,
     AuthorHistorySort,
-    CachedFetchedActivitiesResult, FetchedActivitiesResult,
+    CachedFetchedActivitiesResult, FetchedActivitiesResult, MaybeActivityType,
     SnoowrapActivity, SubredditRemovalReason
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
@@ -1219,6 +1230,156 @@ export class SubredditResources {
             return val !== undefined && val !== null;
         }
         return false;
+    }
+
+    filterAuthorModActions(modActions: ModNote[], actionCriteria: (ModNoteCriteria | ModLogCriteria), referenceItem: SnoowrapActivity) {
+        const {search = 'current', count = '>= 1'} = actionCriteria;
+
+        const {
+            value,
+            operator,
+            isPercent,
+            duration,
+            extra = ''
+        } = parseGenericValueOrPercentComparison(count);
+
+        const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
+
+        let actionsToUse: ModNote[] = [];
+        if(asModNoteCriteria(actionCriteria)) {
+            actionsToUse = modActions.filter(x => x.type === 'NOTE');
+        } else {
+            actionsToUse = modActions;
+        }
+
+        if(search === 'current' && actionsToUse.length > 0) {
+            actionsToUse = [actionsToUse[0]];
+        }
+
+        let validActions: ModNote[] = [];
+        if (asModLogCriteria(actionCriteria)) {
+            const fullCrit = toFullModLogCriteria(actionCriteria);
+            const fullCritEntries = Object.entries(fullCrit);
+            validActions = actionsToUse.filter(x => {
+
+                // filter out any notes that occur before time range
+                if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                    return false;
+                }
+
+                for (const [k, v] of fullCritEntries) {
+                    const key = k.toLocaleLowerCase();
+                    if (['count', 'search'].includes(key)) {
+                        continue;
+                    }
+                    switch (key) {
+                        case 'type':
+                            if (!v.includes((x.type as ModActionType))) {
+                                return false
+                            }
+                            break;
+                        case 'activitytype':
+                            const anyMatch = v.some((a: MaybeActivityType) => {
+                                switch (a) {
+                                    case 'submission':
+                                        return isSubmission(x.action.actedOn);
+                                    case 'comment':
+                                        return isComment(x.action.actedOn);
+                                    case false:
+                                        return x.action.actedOn === undefined || (!asSubmission(x.action.actedOn) && !asComment(x.action.actedOn));
+                                }
+                            });
+                            if (!anyMatch) {
+                                return false;
+                            }
+                            break;
+                        case 'description':
+                        case 'action':
+                        case 'details':
+                            const actionPropVal = x.action[key] as string;
+                            if (actionPropVal === undefined) {
+                                return false;
+                            }
+                            const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                            if (!anyPropMatch) {
+                                return false;
+                            }
+                            break;
+                        case 'referencescurrentactivity':
+                            const isCurrentActivity = x.action.actedOn !== undefined && referenceItem !== undefined && x.action.actedOn.name === referenceItem.name;
+                            if((v === true && !isCurrentActivity) || (v === false && isCurrentActivity)) {
+                                return false;
+                            }
+                            break;
+                    } // case end
+
+                } // for each end
+
+                return true;
+            }); // filter end
+        } else if(asModNoteCriteria(actionCriteria)) {
+            const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
+            const fullCritEntries = Object.entries(fullCrit);
+            validActions = actionsToUse.filter(x => {
+
+                // filter out any notes that occur before time range
+                if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                    return false;
+                }
+
+                for (const [k, v] of fullCritEntries) {
+                    const key = k.toLocaleLowerCase();
+                    if (['count', 'search'].includes(key)) {
+                        continue;
+                    }
+                    switch (key) {
+                        case 'notetype':
+                            if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
+                                return false
+                            }
+                            break;
+                        case 'note':
+                            const actionPropVal = x.note.note;
+                            if (actionPropVal === undefined) {
+                                return false;
+                            }
+                            const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                            if (!anyPropMatch) {
+                                return false;
+                            }
+                            break;
+                        case 'activitytype':
+                            const anyMatch = v.some((a: MaybeActivityType) => {
+                                switch (a) {
+                                    case 'submission':
+                                        return isSubmission(x.action.actedOn);
+                                    case 'comment':
+                                        return isComment(x.action.actedOn);
+                                    case false:
+                                        return x.action.actedOn === undefined || (!asSubmission(x.action.actedOn) && !asComment(x.action.actedOn));
+                                }
+                            });
+                            if (!anyMatch) {
+                                return false;
+                            }
+                            break;
+                        case 'referencescurrentactivity':
+                            const isCurrentActivity = x.action.actedOn !== undefined && referenceItem !== undefined && x.action.actedOn.id === referenceItem.name;
+                            if((v === true && !isCurrentActivity) || (v === false && isCurrentActivity)) {
+                                return false;
+                            }
+                            break;
+                    } // case end
+
+                } // for each end
+
+                return true;
+            }); // filter end
+        } else {
+            throw new SimpleError(`Could not determine if a modActions criteria was for Mod Log or Mod Note. Given: ${JSON.stringify(actionCriteria)}`);
+        }
+
+        return [validActions, actionsToUse];
     }
 
     async getAuthorModNotesByActivityAuthor(activity: Comment | Submission) {
@@ -2654,13 +2815,22 @@ export class SubredditResources {
                     case 'flairTemplate':
                     case 'link_flair_text':
                     case 'link_flair_css_class':
-                        if(asSubmission(item)) {
-                            let propertyValue: string | null;
-                            if(k === 'flairTemplate') {
-                                propertyValue = await item.link_flair_template_id;
-                            } else {
-                                propertyValue = await item[k];
-                            }
+                    case 'link_flair_background_color':
+                    case 'authorFlairText':
+                    case 'authorFlairCssClass':
+                    case 'authorFlairTemplateId':
+                    case 'authorFlairBackgroundColor':
+
+                        let actualPropName = cmToSnoowrapActivityMap[k] ?? k;
+
+                        if(!asSubmission(item) && (actualPropName as string).includes('link_flair')) {
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
+                            log.warn(`Cannot test for ${k} on Comment`);
+                            break;
+                        } else {
+                            // @ts-ignore
+                            let propertyValue: string | null = await item[actualPropName];
 
                             propResultsMap[k]!.found = propertyValue;
 
@@ -2674,14 +2844,37 @@ export class SubredditResources {
                                 // if crit is not a boolean but property is "empty" then it'll never pass anyway
                                 propResultsMap[k]!.passed = !include;
                             } else {
-                                const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
-                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase()), include);
+                                // remove # if comparing hex values
+                                const isHex = k.toLowerCase().includes('background');
+
+                                const expectedValues = (typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[])).map(x => isHex ? x.replace('#','').trim() : x.trim());
+                                const cleanProp = isHex ? propertyValue.replace('#','').trim() : propertyValue.trim();
+                                let anyPassed = false;
+                                const errorReasons = [];
+                                for(const expectedVal of expectedValues) {
+                                    try {
+                                        const [regPassed] = testMaybeStringRegex(expectedVal,cleanProp);
+                                        if(regPassed) {
+                                            anyPassed = true;
+                                        }
+                                    } catch (err: any) {
+                                        if(err.message.includes('Could not convert test value')) {
+                                            errorReasons.push(`Could not convert ${expectedVal} to Regex, fallback to simple case-insenstive comparison`);
+                                            // fallback to simple comparison
+                                            anyPassed = expectedVal.toLowerCase() === cleanProp.toLowerCase();
+                                        } else {
+                                            errorReasons.push(err.message);
+                                        }
+                                    }
+                                    if(anyPassed) {
+                                        break;
+                                    }
+                                }
+                                if(errorReasons.length > 0) {
+                                    propResultsMap[k]!.reason = `Some errors occurred while testing: ${errorReasons.join(' | ')}`;
+                                }
+                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(anyPassed, include);
                             }
-                            break;
-                        } else {
-                            propResultsMap[k]!.passed = true;
-                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
-                            log.warn(`Cannot test for ${k} on Comment`);
                             break;
                         }
                     default:
@@ -3042,10 +3235,11 @@ export class SubredditResources {
                             }
                             break;
                         case 'userNotes':
+                            const unCriterias = (authorOpts[k] as UserNoteCriteria[]).map(x => toFullUserNoteCriteria(x));
                             const notes = await this.userNotes.getUserNotes(item.author);
                             let foundNoteResult: string[] = [];
                             const notePass = () => {
-                                for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
+                                for (const noteCriteria of unCriterias) {
                                     const {count = '>= 1', search = 'current', type} = noteCriteria;
                                     const {
                                         value,
@@ -3054,26 +3248,14 @@ export class SubredditResources {
                                         duration,
                                         extra = ''
                                     } = parseGenericValueOrPercentComparison(count);
-                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
                                     const order = extra.includes('asc') ? 'ascending' : 'descending';
                                     switch (search) {
-                                        case 'current':
-                                            if (notes.length > 0) {
-                                                const currentNoteType = notes[notes.length - 1].noteType;
-                                                foundNoteResult.push(`Current => ${currentNoteType}`);
-                                                if (currentNoteType === type) {
-                                                    return true;
-                                                }
-                                            } else {
-                                                foundNoteResult.push('No notes present');
-                                            }
-                                            break;
                                         case 'consecutive':
                                             if (isPercent) {
                                                 throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
                                             }
 
-                                            let orderedNotes = cutoffDate === undefined ? notes : notes.filter(x => x.time.isSameOrAfter(cutoffDate));
+                                            let orderedNotes = [...notes];
                                             if (order === 'descending') {
                                                 orderedNotes = [...notes];
                                                 orderedNotes.reverse();
@@ -3081,7 +3263,7 @@ export class SubredditResources {
                                             let currCount = 0;
                                             let maxCount = 0;
                                             for (const note of orderedNotes) {
-                                                if (note.noteType === type) {
+                                                if(note.matches(noteCriteria, item)) {
                                                     currCount++;
                                                     maxCount = Math.max(maxCount, currCount);
                                                 } else {
@@ -3093,8 +3275,10 @@ export class SubredditResources {
                                                 return true;
                                             }
                                             break;
+                                        case 'current':
                                         case 'total':
-                                            const filteredNotes = notes.filter(x => x.noteType === type && cutoffDate === undefined || (x.time.isSameOrAfter(cutoffDate)));
+                                            const notesToUse = search === 'current' ? [notes[notes.length - 1]] : notes;
+                                            const filteredNotes = notesToUse.filter(x => x.matches(noteCriteria, item));
                                             if (isPercent) {
                                                 // avoid divide by zero
                                                 const percent = notes.length === 0 ? 0 : filteredNotes.length / notes.length;
@@ -3104,7 +3288,7 @@ export class SubredditResources {
                                                 }
                                             } else {
                                                 foundNoteResult.push(`${filteredNotes.length} are ${type}`);
-                                                if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
+                                                if (comparisonTextOp(filteredNotes.length, operator, value)) {
                                                     return true;
                                                 }
                                             }
@@ -3132,7 +3316,6 @@ export class SubredditResources {
 
                                     const {search = 'current', count = '>= 1'} = actionCriteria;
 
-
                                     const {
                                         value,
                                         operator,
@@ -3140,146 +3323,10 @@ export class SubredditResources {
                                         duration,
                                         extra = ''
                                     } = parseGenericValueOrPercentComparison(count);
-                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
 
-                                    let actionsToUse: ModNote[] = [];
-                                    if(asModNoteCriteria(actionCriteria)) {
-                                        actionsToUse = actionsToUse.filter(x => x.type === 'NOTE');
-                                    } else {
-                                        actionsToUse = modActions;
-                                    }
-
-                                    if(search === 'current' && actionsToUse.length > 0) {
-                                        actionsToUse = [actionsToUse[0]];
-                                    }
-
-                                    let validActions: ModNote[] = [];
-                                    if (asModLogCriteria(actionCriteria)) {
-                                        const fullCrit = toFullModLogCriteria(actionCriteria);
-                                        const fullCritEntries = Object.entries(fullCrit);
-                                        validActions = actionsToUse.filter(x => {
-
-                                            // filter out any notes that occur before time range
-                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
-                                                return false;
-                                            }
-
-                                            for (const [k, v] of fullCritEntries) {
-                                                const key = k.toLocaleLowerCase();
-                                                if (['count', 'search'].includes(key)) {
-                                                    continue;
-                                                }
-                                                switch (key) {
-                                                    case 'type':
-                                                        if (!v.includes((x.type as ModActionType))) {
-                                                            return false
-                                                        }
-                                                        break;
-                                                    case 'activitytype':
-                                                        const anyMatch = v.some((a: ActivityType) => {
-                                                            switch (a) {
-                                                                case 'submission':
-                                                                    if (x.action.actedOn instanceof Submission) {
-                                                                        return true;
-                                                                    }
-                                                                    break;
-                                                                case 'comment':
-                                                                    if (x.action.actedOn instanceof Comment) {
-                                                                        return true;
-                                                                    }
-                                                                    break;
-                                                            }
-                                                        });
-                                                        if (!anyMatch) {
-                                                            return false;
-                                                        }
-                                                        break;
-                                                    case 'description':
-                                                    case 'action':
-                                                    case 'details':
-                                                        const actionPropVal = x.action[key] as string;
-                                                        if (actionPropVal === undefined) {
-                                                            return false;
-                                                        }
-                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
-                                                        if (!anyPropMatch) {
-                                                            return false;
-                                                        }
-                                                } // case end
-
-                                            } // for each end
-
-                                            return true;
-                                        }); // filter end
-                                    } else if(asModNoteCriteria(actionCriteria)) {
-                                        const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
-                                        const fullCritEntries = Object.entries(fullCrit);
-                                        validActions = actionsToUse.filter(x => {
-
-                                            // filter out any notes that occur before time range
-                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
-                                                return false;
-                                            }
-
-                                            for (const [k, v] of fullCritEntries) {
-                                                const key = k.toLocaleLowerCase();
-                                                if (['count', 'search'].includes(key)) {
-                                                    continue;
-                                                }
-                                                switch (key) {
-                                                    case 'notetype':
-                                                        if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
-                                                            return false
-                                                        }
-                                                        break;
-                                                    case 'note':
-                                                        const actionPropVal = x.note.note;
-                                                        if (actionPropVal === undefined) {
-                                                            return false;
-                                                        }
-                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
-                                                        if (!anyPropMatch) {
-                                                            return false;
-                                                        }
-                                                        break;
-                                                    case 'activitytype':
-                                                        const anyMatch = v.some((a: ActivityType) => {
-                                                            switch (a) {
-                                                                case 'submission':
-                                                                    if (x.action.actedOn instanceof Submission) {
-                                                                        return true;
-                                                                    }
-                                                                    break;
-                                                                case 'comment':
-                                                                    if (x.action.actedOn instanceof Comment) {
-                                                                        return true;
-                                                                    }
-                                                                    break;
-                                                            }
-                                                        });
-                                                        if (!anyMatch) {
-                                                            return false;
-                                                        }
-                                                        break;
-                                                } // case end
-
-                                            } // for each end
-
-                                            return true;
-                                        }); // filter end
-                                    } else {
-                                        throw new SimpleError(`Could not determine if a modActions criteria was for Mod Log or Mod Note. Given: ${JSON.stringify(actionCriteria)}`);
-                                    }
+                                    const [validActions, actionsToUse] = this.filterAuthorModActions(modActions, actionCriteria, item);
 
                                     switch (search) {
-                                        case 'current':
-                                            if (validActions.length === 0) {
-                                                actionResult.push('No Mod Actions present');
-                                            } else {
-                                                actionResult.push('Current Action matches criteria');
-                                                return true;
-                                            }
-                                            break;
                                         case 'consecutive':
                                             if (isPercent) {
                                                 throw new SimpleError(`When comparing Mod Actions with 'search: consecutive' the 'count' value cannot be a percentage. Given: ${count}`);
@@ -3306,10 +3353,11 @@ export class SubredditResources {
                                                 return true;
                                             }
                                             break;
+                                        case 'current':
                                         case 'total':
                                             if (isPercent) {
                                                 // avoid divide by zero
-                                                const percent = notes.length === 0 ? 0 : validActions.length / actionsToUse.length;
+                                                const percent = actionsToUse.length === 0 ? 0 : validActions.length / actionsToUse.length;
                                                 actionResult.push(`${formatNumber(percent)}% of ${actionsToUse.length} matched criteria`);
                                                 if (comparisonTextOp(percent, operator, value / 100)) {
                                                     return true;

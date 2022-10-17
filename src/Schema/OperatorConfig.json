@@ -534,6 +534,74 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
+                "authorFlairBackgroundColor": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY color\n* If `false` then passes if NO color\n* If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairCssClass": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY class\n* If `false` then passes if NO class\n* If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairTemplateId": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then template id is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairText": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
                 "createdOn": {
                     "anyOf": [
                         {
@@ -900,8 +968,18 @@
                 "credentials": {
                     "$ref": "#/definitions/InfluxCredentials"
                 },
+                "debug": {
+                    "type": "boolean"
+                },
                 "defaultTags": {
                     "$ref": "#/definitions/Record<string,string>"
+                },
+                "useKeepAliveAgent": {
+                    "type": "boolean"
+                },
+                "writeOptions": {
+                    "$ref": "#/definitions/WriteOptions",
+                    "description": "Options used by{@linkWriteApi}."
                 }
             },
             "required": [
@@ -1065,18 +1143,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -1114,6 +1192,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",
@@ -1166,18 +1247,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -1235,6 +1316,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",
@@ -1860,6 +1944,74 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
+                "authorFlairBackgroundColor": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY color\n* If `false` then passes if NO color\n* If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairCssClass": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY class\n* If `false` then passes if NO class\n* If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairTemplateId": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then template id is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
+                "authorFlairText": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY flair\n* If `false` then passes if NO flair\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
+                },
                 "createdOn": {
                     "anyOf": [
                         {
@@ -1924,6 +2076,23 @@
                 "is_self": {
                     "type": "boolean"
                 },
+                "link_flair_background_color": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if ANY color\n* If `false` then passes if NO color\n* If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes."
+                },
                 "link_flair_css_class": {
                     "anyOf": [
                         {
@@ -1939,7 +2108,7 @@
                             ]
                         }
                     ],
-                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css"
+                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css\n* If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
                 },
                 "link_flair_text": {
                     "anyOf": [
@@ -1956,7 +2125,7 @@
                             ]
                         }
                     ],
-                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text"
+                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
                 },
                 "locked": {
                     "type": "boolean"
@@ -2124,6 +2293,23 @@
                     "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<duration>in\\s+\\d+\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\\s*(?<extra>asc.*|desc.*)*$",
                     "type": "string"
                 },
+                "note": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The content of the Note to search For.\n\n* Can be a single string or list of strings to search for. Each string will be searched for case-insensitive, as a subset of note content.\n* Can also be Regular Expression if wrapped in forward slashes IE '\\/test.*\\/i'"
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
+                },
                 "search": {
                     "default": "current",
                     "description": "How to test the Toolbox Notes or Mod Actions for this Author:\n\n### current\n\nOnly the most recent note is checked for criteria\n\n### total\n\n`count` comparison of mod actions/notes must be found within all history\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n* EX: `count: > 3 in 1 week` => Must have more than 3 notes within the last week\n\n### consecutive\n\nThe `count` **number** of mod actions/notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
@@ -2182,6 +2368,94 @@
                     "type": "string"
                 }
             },
+            "type": "object"
+        },
+        "WriteOptions": {
+            "description": "Options used by{@linkWriteApi}.",
+            "properties": {
+                "batchSize": {
+                    "description": "max number of records/lines to send in a batch",
+                    "type": "number"
+                },
+                "consistency": {
+                    "description": "InfluxDB Enterprise write consistency as explained in https://docs.influxdata.com/enterprise_influxdb/v1.9/concepts/clustering/#write-consistency",
+                    "enum": [
+                        "all",
+                        "any",
+                        "one",
+                        "quorum"
+                    ],
+                    "type": "string"
+                },
+                "defaultTags": {
+                    "$ref": "#/definitions/Record<string,string>",
+                    "description": "default tags, unescaped"
+                },
+                "exponentialBase": {
+                    "description": "base for the exponential retry delay",
+                    "type": "number"
+                },
+                "flushInterval": {
+                    "description": "delay between data flushes in milliseconds, at most `batch size` records are sent during flush",
+                    "type": "number"
+                },
+                "gzipThreshold": {
+                    "description": "When specified, write bodies larger than the threshold are gzipped",
+                    "type": "number"
+                },
+                "headers": {
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "HTTP headers that will be sent with every write request",
+                    "type": "object"
+                },
+                "maxBatchBytes": {
+                    "description": "max size of a batch in bytes",
+                    "type": "number"
+                },
+                "maxBufferLines": {
+                    "description": "the maximum size of retry-buffer (in lines)",
+                    "type": "number"
+                },
+                "maxRetries": {
+                    "description": "max count of retries after the first write fails",
+                    "type": "number"
+                },
+                "maxRetryDelay": {
+                    "description": "maximum delay when retrying write (milliseconds)",
+                    "type": "number"
+                },
+                "maxRetryTime": {
+                    "description": "max time (millis) that can be spent with retries",
+                    "type": "number"
+                },
+                "minRetryDelay": {
+                    "description": "minimum delay when retrying write (milliseconds)",
+                    "type": "number"
+                },
+                "randomRetry": {
+                    "description": "randomRetry indicates whether the next retry delay is deterministic (false) or random (true).\nThe deterministic delay starts with `minRetryDelay * exponentialBase` and it is multiplied\nby `exponentialBase` until it exceeds `maxRetryDelay`.\nWhen random is `true`, the next delay is computed as a random number between next retry attempt (upper)\nand the lower number in the deterministic sequence. `random(retryJitter)` is added to every returned value.",
+                    "type": "boolean"
+                },
+                "retryJitter": {
+                    "description": "add `random(retryJitter)` milliseconds delay when retrying HTTP calls",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "batchSize",
+                "exponentialBase",
+                "flushInterval",
+                "maxBatchBytes",
+                "maxBufferLines",
+                "maxRetries",
+                "maxRetryDelay",
+                "maxRetryTime",
+                "minRetryDelay",
+                "randomRetry",
+                "retryJitter"
+            ],
             "type": "object"
         }
     },

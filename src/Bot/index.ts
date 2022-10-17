@@ -529,7 +529,7 @@ class Bot implements BotInstanceFunctions {
         for (const sub of subsToRun) {
             if(!this.subManagers.some(x => x.subreddit.display_name === sub.display_name)) {
                 subManagersChanged = true;
-                this.logger.info(`Manager for ${sub.display_name_prefixed} not found in existing managers. Creating now...`);
+                this.logger.info(`Manager for ${sub.display_name_prefixed} not found in loaded managers. Loading now...`);
                 subsToInit.push(sub.display_name);
                 try {
                     this.subManagers.push(await this.createManager(sub));
@@ -743,6 +743,9 @@ class Bot implements BotInstanceFunctions {
                 eventsState: new EventsRunState({invokee, runType}),
                 managerState: new ManagerRunState({invokee, runType})
             }));
+            this.logger.info(`Created new Manager (${managerEntity.id}) for ${subVal.display_name}`);
+        } else {
+            this.logger.info(`Found existing Manager (${managerEntity.id}) for ${subVal.display_name}`);
         }
 
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {

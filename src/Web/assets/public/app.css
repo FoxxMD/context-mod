@@ -169,6 +169,14 @@ a {
     display: inherit;
 }
 
+.show {
+    display: inherit;
+}
+
+.invisible {
+    display: none;
+}
+
 .triggeredStateToggle {
     cursor: pointer;
 }
@@ -183,7 +191,7 @@ li > ul {
 }
 
 .smallLi:before {
-    margin-left: -10px;
+    margin-left: -5px;
     content: ""
 }
 

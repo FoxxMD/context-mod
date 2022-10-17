@@ -1,6 +1,7 @@
 import {Comment, Submission} from "snoowrap/dist/objects";
 
 export type ActivityType = 'submission' | 'comment';
+export type MaybeActivityType = ActivityType | false;
 export type FullNameTypes = ActivityType | 'user' | 'subreddit' | 'message';
 
 export interface RedditThing {
