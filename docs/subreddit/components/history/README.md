@@ -46,5 +46,5 @@ Example:
 
 ### Examples
 
-* Low Comment Engagement [YAML](/docs/subreddit/componentscomponents/history/lowEngagement.yaml) | [JSON](/docs/subreddit/componentscomponents/history/lowEngagement.json5) - Check if Author is submitting much more than they comment.
-* OP Comment Engagement [YAML](/docs/subreddit/componentscomponents/history/opOnlyEngagement.yaml) | [JSON](/docs/subreddit/componentscomponents/history/opOnlyEngagement.json5) - Check if Author is mostly engaging only in their own content
+* Low Comment Engagement [YAML](/docs/subreddit/components/history/lowEngagement.yaml) | [JSON](/docs/subreddit/components/history/lowEngagement.json5) - Check if Author is submitting much more than they comment.
+* OP Comment Engagement [YAML](/docs/subreddit/components/history/opOnlyEngagement.yaml) | [JSON](/docs/subreddit/components/history/opOnlyEngagement.json5) - Check if Author is mostly engaging only in their own content
