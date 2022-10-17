@@ -74,7 +74,7 @@ import {ErrorWithCause} from "pony-cause";
 import {RunConfigHydratedData, RunConfigData, RunConfigObject} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
 import {
-    CacheProvider, ConfigFormat, ConfigFragmentValidationFunc,
+    CacheProvider, ConfigFormat, ConfigFragmentParseFunc,
     PollOn
 } from "./Common/Infrastructure/Atomic";
 import {
@@ -169,7 +169,7 @@ export class ConfigBuilder {
         return validateJson<SubredditConfigData>(config, appSchema, this.logger);
     }
 
-    async hydrateConfigFragment<T>(val: IncludesData | string | object, resource: SubredditResources, validateFunc?: ConfigFragmentValidationFunc): Promise<T[]> {
+    async hydrateConfigFragment<T>(val: IncludesData | string | object, resource: SubredditResources, parseFunc?: ConfigFragmentParseFunc): Promise<T[]> {
         let includes: IncludesData | undefined = undefined;
         if(typeof val === 'string') {
             const strContextResult = parseUrlContext(val);
@@ -197,7 +197,7 @@ export class ConfigBuilder {
             }
         }
 
-       const resolvedFragment = await resource.getConfigFragment(includes, validateFunc);
+       const resolvedFragment = await resource.getConfigFragment(includes, parseFunc);
         if(Array.isArray(resolvedFragment)) {
             return resolvedFragment
         }
@@ -230,18 +230,19 @@ export class ConfigBuilder {
             let hydratedRunArr: RunConfigData | RunConfigData[];
 
             try {
-                hydratedRunArr = await this.hydrateConfigFragment<RunConfigData>(r, resource, <RunConfigData>(data: object, fetched: boolean) => {
-                    if (fetched) {
-                        if (Array.isArray(data)) {
-                            for (const runData of data) {
+                hydratedRunArr = await this.hydrateConfigFragment<RunConfigData>(r, resource, <RunConfigData>(data: any, fetched: boolean) => {
+                    const runDataVals = data.runs !== undefined ? data.runs : data;
+                    if (!fetched) {
+                        if (Array.isArray(runDataVals)) {
+                            for (const runData of runDataVals) {
                                 validateJson<RunConfigData>(runData, runSchema, this.logger);
                             }
                         } else {
-                            validateJson<RunConfigData>(data, runSchema, this.logger);
+                            validateJson<RunConfigData>(runDataVals, runSchema, this.logger);
                         }
-                        return true;
+                        return runDataVals;
                     }
-                    return true;
+                    return runDataVals;
                 });
             } catch (e: any) {
                 throw new CMError(`Could not fetch or validate Run #${runIndex}`, {cause: e});
@@ -272,9 +273,9 @@ export class ConfigBuilder {
                                 } else {
                                     validateJson<ActivityCheckConfigHydratedData>(data, checkSchema, this.logger);
                                 }
-                                return true;
+                                return data;
                             }
-                            return true;
+                            return data;
                         });
                     } catch (e: any) {
                         throw new CMError(`Could not fetch or validate Check Config Fragment #${checkIndex} in Run #${runIndex}`, {cause: e});

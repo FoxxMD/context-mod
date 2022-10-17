@@ -1785,7 +1785,7 @@ export class SubredditResources {
         return this.renderContent(footer, item);
     }
 
-    async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentValidationFunc): Promise<T> {
+    async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentParseFunc): Promise<T> {
 
         const {
             path,
@@ -1813,8 +1813,7 @@ export class SubredditResources {
         // otherwise now we want to validate it if a function is present
         if(validateFunc !== undefined) {
             try {
-               validateFunc(configObj.toJS(), fromCache);
-               validatedData = rawData as unknown as T;
+                validatedData = validateFunc(configObj.toJS(), fromCache) as unknown as T;
             } catch (e) {
                 throw e;
             }
