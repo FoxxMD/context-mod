@@ -17,7 +17,7 @@ import {
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData,
+    defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData,
     formatLogLineToHtml, filterLogs, getUserAgent,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
@@ -64,6 +64,7 @@ import {
     InviteData, SubredditInviteDataPersisted
 } from "../Common/interfaces";
 import {open} from "fs/promises";
+import {createCacheManager} from "../../Common/Cache";
 
 const emitter = new EventEmitter();
 
@@ -323,7 +324,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         cookie: {
             maxAge: sessionMaxAge * 1000,
         },
-        store: sessionStoreProvider.createSessionStore(sessionStorage === 'database' ? {
+        store: await sessionStoreProvider.createSessionStore(sessionStorage === 'database' ? {
             cleanupLimit: 2,
             ttl: sessionMaxAge
         } : {}),

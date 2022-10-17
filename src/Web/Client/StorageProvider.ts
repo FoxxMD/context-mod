@@ -1,7 +1,7 @@
 import {SessionOptions, Store} from "express-session";
 import {TypeormStore} from "connect-typeorm";
 import {InviteData} from "../Common/interfaces";
-import {buildCachePrefix, createCacheManager, mergeArr} from "../../util";
+import {buildCachePrefix, mergeArr} from "../../util";
 import {Cache} from "cache-manager";
 // @ts-ignore
 import CacheManagerStore from 'express-session-cache-manager'
@@ -11,6 +11,7 @@ import {ClientSession} from "../../Common/WebEntities/ClientSession";
 import {Logger} from "winston";
 import {WebSetting} from "../../Common/WebEntities/WebSetting";
 import {ErrorWithCause} from "pony-cause";
+import {createCacheManager} from "../../Common/Cache";
 
 export interface CacheManagerStoreOptions {
     prefix?: string
@@ -24,7 +25,7 @@ export type TypeormStoreOptions = Partial<SessionOptions & {
 }>;
 
 interface IWebStorageProvider {
-    createSessionStore(options?: CacheManagerStoreOptions | TypeormStoreOptions): Store
+    createSessionStore(options?: CacheManagerStoreOptions | TypeormStoreOptions): Promise<Store>
 
     getSessionSecret(): Promise<string | undefined>
 
@@ -48,7 +49,7 @@ abstract class StorageProvider implements IWebStorageProvider {
         this.logger = logger.child({labels: ['Web', 'Storage', ...loggerLabels]}, mergeArr);
     }
 
-    abstract createSessionStore(options?: CacheManagerStoreOptions | TypeormStoreOptions): Store;
+    abstract createSessionStore(options?: CacheManagerStoreOptions | TypeormStoreOptions): Promise<Store>;
 
     abstract getSessionSecret(): Promise<string | undefined>;
 
@@ -57,24 +58,24 @@ abstract class StorageProvider implements IWebStorageProvider {
 
 export class CacheStorageProvider extends StorageProvider {
 
-    protected cache: Cache;
+    protected cache: Promise<Cache>;
 
     constructor(caching: CacheOptions & StorageProviderOptions) {
         super(caching);
         const {logger, invitesMaxAge, loggerLabels, ...restCache } = caching;
-        this.cache = createCacheManager({...restCache, prefix: buildCachePrefix(['web'])}) as Cache;
+        this.cache = createCacheManager({...restCache, prefix: buildCachePrefix(['web'])}) as Promise<Cache>;
         this.logger.debug('Using CACHE');
         if (caching.store === 'none') {
             this.logger.warn(`Using 'none' as cache provider means no one will be able to access the interface since sessions will never be persisted!`);
         }
     }
 
-    createSessionStore(options?: CacheManagerStoreOptions): Store {
-        return new CacheManagerStore(this.cache, {prefix: 'sess:'});
+    async createSessionStore(options?: CacheManagerStoreOptions): Promise<Store> {
+        return new CacheManagerStore((await this.cache), {prefix: 'sess:'});
     }
 
     async getSessionSecret() {
-        const val = await this.cache.get(`sessionSecret`);
+        const val = await (await this.cache).get(`sessionSecret`);
         if (val === null || val === undefined) {
             return undefined;
         }
@@ -82,7 +83,7 @@ export class CacheStorageProvider extends StorageProvider {
     }
 
     async setSessionSecret(secret: string) {
-        await this.cache.set('sessionSecret', secret, {ttl: 0});
+        await (await this.cache).set('sessionSecret', secret, {ttl: 0});
     }
 
 }
@@ -101,7 +102,7 @@ export class DatabaseStorageProvider extends StorageProvider {
         this.logger.debug('Using DATABASE');
     }
 
-    createSessionStore(options?: TypeormStoreOptions): Store {
+    async createSessionStore(options?: TypeormStoreOptions): Promise<Store> {
         return new TypeormStore(options).connect(this.clientSessionRepo)
     }
 
