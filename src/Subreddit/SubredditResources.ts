@@ -14,10 +14,8 @@ import {
     asActivity,
     asSubmission,
     asUserNoteCriteria,
-    buildCacheOptionsFromProvider,
     buildCachePrefix,
     cacheStats,
-    createCacheManager,
     escapeRegex,
     FAIL,
     fetchExternalResult,
@@ -173,6 +171,7 @@ import ConfigParseError from "../Utils/ConfigParseError";
 import {ActivityReport} from "../Common/Entities/ActivityReport";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {ActivitySource} from "../Common/ActivitySource";
+import {buildCacheOptionsFromProvider, createCacheManager} from "../Common/Cache";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -3545,7 +3544,7 @@ export class BotResourcesManager {
     authorTTL: number = 10000;
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
-    defaultCache: Cache;
+    defaultCache: Promise<Cache>;
     defaultCacheConfig: StrongCache
     defaultCacheMigrated: boolean = false;
     cacheType: string = 'none';
@@ -3649,7 +3648,7 @@ export class BotResourcesManager {
         // });
 
         let opts: SubredditResourceOptions = {
-            cache: this.defaultCache,
+            cache: await this.defaultCache,
             cacheType: this.cacheType,
             cacheSettingsHash: hash,
             ttl: this.ttlDefaults,
@@ -3680,7 +3679,7 @@ export class BotResourcesManager {
                 trueProvider.prefix = subPrefix;
                 const eventsMax = this.actionedEventsMaxDefault !== undefined ? Math.min(actionedEventsMax, this.actionedEventsMaxDefault) : actionedEventsMax;
                 opts = {
-                    cache: createCacheManager(trueProvider),
+                    cache: await createCacheManager(trueProvider),
                     actionedEventsMax: eventsMax,
                     cacheType: trueProvider.store,
                     cacheSettingsHash: hash,
@@ -3695,7 +3694,7 @@ export class BotResourcesManager {
                 await runMigrations(opts.cache, opts.logger, trueProvider.prefix);
             }
         } else if(!this.defaultCacheMigrated) {
-            await runMigrations(this.defaultCache, this.logger, opts.prefix);
+            await runMigrations(await this.defaultCache, this.logger, opts.prefix);
             this.defaultCacheMigrated = true;
         }
 
@@ -3730,7 +3729,7 @@ export class BotResourcesManager {
     }
 
     async getPendingSubredditInvites(): Promise<(string[])> {
-        const subredditNames = await this.defaultCache.get(`modInvites`);
+        const subredditNames = await (await this.defaultCache).get(`modInvites`);
         if (subredditNames !== undefined && subredditNames !== null) {
             return subredditNames as string[];
         }
@@ -3741,7 +3740,7 @@ export class BotResourcesManager {
         if(subreddit === null || subreddit === undefined || subreddit == '') {
             throw new CMError('Subreddit name cannot be empty');
         }
-        let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
+        let subredditNames = await (await this.defaultCache).get(`modInvites`) as (string[] | undefined | null);
         if (subredditNames === undefined || subredditNames === null) {
             subredditNames = [];
         }
@@ -3751,22 +3750,22 @@ export class BotResourcesManager {
             throw new CMError(`An invite for the Subreddit '${subreddit}' already exists`);
         }
         subredditNames.push(cleanName);
-        await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
+        await (await this.defaultCache).set(`modInvites`, subredditNames, {ttl: 0});
         return;
     }
 
     async deletePendingSubredditInvite(subreddit: string): Promise<void> {
-        let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
+        let subredditNames = await (await this.defaultCache).get(`modInvites`) as (string[] | undefined | null);
         if (subredditNames === undefined || subredditNames === null) {
             subredditNames = [];
         }
         subredditNames = subredditNames.filter(x => x.toLowerCase() !== subreddit.trim().toLowerCase());
-        await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
+        await (await this.defaultCache).set(`modInvites`, subredditNames, {ttl: 0});
         return;
     }
 
     async clearPendingSubredditInvites(): Promise<void> {
-        await this.defaultCache.del(`modInvites`);
+        await (await this.defaultCache).del(`modInvites`);
         return;
     }
 }
