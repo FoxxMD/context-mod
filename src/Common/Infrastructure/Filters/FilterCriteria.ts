@@ -119,6 +119,34 @@ export interface UserNoteCriteria extends UserSubredditHistoryCriteria {
      * @examples ["spamwarn"]
      * */
     type: string;
+    /**
+     * The content of the Note to search For.
+     *
+     * * Can be a single string or list of strings to search for. Each string will be searched for case-insensitive, as a subset of note content.
+     * * Can also be Regular Expression if wrapped in forward slashes IE '\/test.*\/i'
+     * */
+    note?: string | string[]
+    /*
+    * Does this note link to the currently processing Activity?
+    * */
+    referencesCurrentActivity?: boolean
+}
+
+export interface FullUserNoteCriteria extends Omit<UserNoteCriteria, 'note'> {
+    note?: RegExp[]
+}
+
+export const toFullUserNoteCriteria = (val: UserNoteCriteria): FullUserNoteCriteria => {
+    const {note} = val;
+    let notesVal = undefined;
+    if (note !== undefined) {
+        const notesArr = Array.isArray(note) ? note : [note];
+        notesVal = notesArr.map(x => parseStringToRegexOrLiteralSearch(x));
+    }
+    return {
+        ...val,
+        note: notesVal
+    }
 }
 
 export interface ModActionCriteria extends UserSubredditHistoryCriteria {
@@ -130,6 +158,9 @@ export interface ModActionCriteria extends UserSubredditHistoryCriteria {
 export interface FullModActionCriteria extends Omit<ModActionCriteria, 'count'> {
     type?: ModActionType[]
     count?: GenericComparison
+    /*
+    * Does this action/note link to the currently processing Activity?
+    * */
     activityType?: MaybeActivityType[]
 }
 
@@ -140,6 +171,12 @@ export interface ModNoteCriteria extends ModActionCriteria {
 
 export interface FullModNoteCriteria extends FullModActionCriteria, Omit<ModNoteCriteria, 'note' | 'count' | 'type' | 'activityType'> {
     noteType?: ModUserNoteLabel[]
+    /**
+     * The content of the Note to search For.
+     *
+     * * Can be a single string or list of strings to search for. Each string will be searched for case-insensitive, as a subset of note content.
+     * * Can also be Regular Expression if wrapped in forward slashes IE '\/test.*\/i'
+     * */
     note?: RegExp[]
 }
 

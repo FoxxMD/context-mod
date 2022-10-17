@@ -6270,7 +6270,7 @@
             "properties": {
                 "allowDuplicate": {
                     "default": false,
-                    "description": "Add Note even if a Note already exists for this Activity",
+                    "description": "Add Note even if a Note already exists for this Activity\n\nUSE `existingNoteCheck` INSTEAD",
                     "examples": [
                         false
                     ],
@@ -6325,6 +6325,21 @@
                         true
                     ],
                     "type": "boolean"
+                },
+                "existingNoteCheck": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/UserNoteCriteria"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "default": true,
+                    "description": "Check if there is an existing Note matching some criteria before adding the Note.\n\nIf this check passes then the Note is added. The value may be a boolean or UserNoteCriteria.\n\nBoolean convenience:\n\n* If `true` or undefined then CM generates a UserNoteCriteria that passes only if there is NO existing note matching note criteria\n* If `false` then no check is performed and Note is always added",
+                    "examples": [
+                        true
+                    ]
                 },
                 "itemIs": {
                     "anyOf": [
@@ -6392,6 +6407,23 @@
                     ],
                     "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<duration>in\\s+\\d+\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\\s*(?<extra>asc.*|desc.*)*$",
                     "type": "string"
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The content of the Note to search For.\n\n* Can be a single string or list of strings to search for. Each string will be searched for case-insensitive, as a subset of note content.\n* Can also be Regular Expression if wrapped in forward slashes IE '\\/test.*\\/i'"
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",

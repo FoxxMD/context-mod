@@ -754,7 +754,7 @@ actions:
   - kind: usernote
     type: spamwarn
     content: 'Usernote message'
-    allowDuplicate: boolean # if false then the usernote will not be added if the same note appears for this activity
+    existingNoteCheck: boolean # if true (default) then the usernote will not be added if the same note appears for this activity
 ```
 
 ### Mod Note
@@ -779,6 +779,7 @@ actions:
     type: SPAM_WATCH
     content: 'a note only mods can see message' # optional
     referenceActivity: boolean # if true the Note will be linked to the Activity being processed
+    existingNoteCheck: boolean # if true (default) then the note will not be added if the same note appears for this activity
 ```
 
 # Filters

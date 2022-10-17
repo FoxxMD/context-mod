@@ -123,7 +123,7 @@ import {
     SubmissionState,
     SubredditCriteria,
     toFullModLogCriteria,
-    toFullModNoteCriteria,
+    toFullModNoteCriteria, toFullUserNoteCriteria,
     TypedActivityState,
     TypedActivityStates,
     UserNoteCriteria
@@ -3235,10 +3235,11 @@ export class SubredditResources {
                             }
                             break;
                         case 'userNotes':
+                            const unCriterias = (authorOpts[k] as UserNoteCriteria[]).map(x => toFullUserNoteCriteria(x));
                             const notes = await this.userNotes.getUserNotes(item.author);
                             let foundNoteResult: string[] = [];
                             const notePass = () => {
-                                for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
+                                for (const noteCriteria of unCriterias) {
                                     const {count = '>= 1', search = 'current', type} = noteCriteria;
                                     const {
                                         value,
@@ -3247,26 +3248,14 @@ export class SubredditResources {
                                         duration,
                                         extra = ''
                                     } = parseGenericValueOrPercentComparison(count);
-                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
                                     const order = extra.includes('asc') ? 'ascending' : 'descending';
                                     switch (search) {
-                                        case 'current':
-                                            if (notes.length > 0) {
-                                                const currentNoteType = notes[notes.length - 1].noteType;
-                                                foundNoteResult.push(`Current => ${currentNoteType}`);
-                                                if (currentNoteType === type) {
-                                                    return true;
-                                                }
-                                            } else {
-                                                foundNoteResult.push('No notes present');
-                                            }
-                                            break;
                                         case 'consecutive':
                                             if (isPercent) {
                                                 throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
                                             }
 
-                                            let orderedNotes = cutoffDate === undefined ? notes : notes.filter(x => x.time.isSameOrAfter(cutoffDate));
+                                            let orderedNotes = [...notes];
                                             if (order === 'descending') {
                                                 orderedNotes = [...notes];
                                                 orderedNotes.reverse();
@@ -3274,7 +3263,7 @@ export class SubredditResources {
                                             let currCount = 0;
                                             let maxCount = 0;
                                             for (const note of orderedNotes) {
-                                                if (note.noteType === type) {
+                                                if(note.matches(noteCriteria, item)) {
                                                     currCount++;
                                                     maxCount = Math.max(maxCount, currCount);
                                                 } else {
@@ -3286,8 +3275,10 @@ export class SubredditResources {
                                                 return true;
                                             }
                                             break;
+                                        case 'current':
                                         case 'total':
-                                            const filteredNotes = notes.filter(x => x.noteType === type && cutoffDate === undefined || (x.time.isSameOrAfter(cutoffDate)));
+                                            const notesToUse = search === 'current' ? [notes[notes.length - 1]] : notes;
+                                            const filteredNotes = notesToUse.filter(x => x.matches(noteCriteria, item));
                                             if (isPercent) {
                                                 // avoid divide by zero
                                                 const percent = notes.length === 0 ? 0 : filteredNotes.length / notes.length;
@@ -3297,7 +3288,7 @@ export class SubredditResources {
                                                 }
                                             } else {
                                                 foundNoteResult.push(`${filteredNotes.length} are ${type}`);
-                                                if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
+                                                if (comparisonTextOp(filteredNotes.length, operator, value)) {
                                                     return true;
                                                 }
                                             }
