@@ -163,3 +163,9 @@ declare module 'wink-sentiment' {
 
     export default sentiment;
 }
+
+declare module 'cache-manager-redis-store' {
+    import {RedisClientOptions} from "@redis/client";
+    import {Cache, CachingConfig} from "cache-manager";
+    export async function redisStore(config: RedisClientOptions & Partial<CachingConfig>): Cache;
+}
