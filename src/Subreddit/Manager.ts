@@ -53,10 +53,7 @@ import {Submission, Comment, Subreddit} from 'snoowrap/dist/objects';
 import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
 import {
-    BotResourcesManager,
-    SubredditResourceConfig,
-    SubredditResources,
-    SubredditResourceSetOptions
+    SubredditResources
 } from "./SubredditResources";
 import {SPoll, UnmoderatedStream, ModQueueStream, SubmissionStream, CommentStream} from "./Streams";
 import EventEmitter from "events";
@@ -107,6 +104,8 @@ import {InfluxClient} from "../Common/Influx/InfluxClient";
 import { Point } from "@influxdata/influxdb-client";
 import {NormalizedManagerResponse} from "../Web/Common/interfaces";
 import {guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
+import {BotResourcesManager} from "../Bot/ResourcesManager";
+import {SubredditResourceConfig} from "../Common/Subreddit/SubredditResourceInterfaces";
 
 export interface RunningState {
     state: RunState,

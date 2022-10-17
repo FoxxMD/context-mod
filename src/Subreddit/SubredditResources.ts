@@ -1,38 +1,44 @@
-import Snoowrap, {Listing} from "snoowrap";
 import objectHash from 'object-hash';
 import {
-    activityIsDeleted, activityIsFiltered,
+    activityIsDeleted,
+    activityIsFiltered,
     activityIsRemoved,
-    AuthorTypedActivitiesOptions, BOT_LINK, TemplateContext,
-    getAuthorHistoryAPIOptions, renderContent
+    getAuthorHistoryAPIOptions,
+    renderContent,
+    TemplateContext
 } from "../Utils/SnoowrapUtils";
 import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
-import as from 'async';
-import fetch, {Response} from 'node-fetch';
+import {Response} from 'node-fetch';
 import {
     asActivity,
+    asComment,
+    asStrongImageHashCache,
     asSubmission,
+    asSubreddit,
     asUserNoteCriteria,
-    buildCacheOptionsFromProvider,
-    buildCachePrefix,
     cacheStats,
-    createCacheManager,
+    criteriaPassWithIncludeBehavior,
     escapeRegex,
     FAIL,
     fetchExternalResult,
+    filterByTimeRequirement,
     filterCriteriaSummary,
     formatNumber,
+    frequencyEqualOrLargerThanMin,
+    generateFullWikiUrl,
     generateItemFilterHelpers,
     getActivityAuthorName,
     getActivitySubredditName,
-    isComment,
     isCommentState,
+    isRuleSetResult,
     isStrongSubredditState,
     isSubmission,
     isUser,
-    hashString,
+    matchesRelativeDateTime,
     mergeArr,
+    modActionCriteriaSummary,
+    parseDurationValToDuration,
     parseExternalUrl,
     parseRedditEntity,
     parseStringToRegex,
@@ -45,56 +51,27 @@ import {
     testMaybeStringRegex,
     toStrongSubredditState,
     truncateStringToLength,
-    userNoteCriteriaSummary,
-    asComment,
-    criteriaPassWithIncludeBehavior,
-    isRuleSetResult,
-    frequencyEqualOrLargerThanMin,
-    parseDurationValToDuration,
-    windowConfigToWindowCriteria,
-    asStrongSubredditState,
-    convertSubredditsRawToStrong,
-    filterByTimeRequirement,
-    asSubreddit,
-    modActionCriteriaSummary,
-    parseRedditFullname, asStrongImageHashCache, matchesRelativeDateTime, generateFullWikiUrl
+    userNoteCriteriaSummary
 } from "../util";
-import LoggedError from "../Utils/LoggedError";
 import {
-    BotInstanceConfig,
-    CacheOptions,
-    Footer,
-    OperatorConfig,
-    ResourceStats,
-    StrongCache,
-    CacheConfig,
-    TTLConfig,
-    UserResultCache,
-    ActionedEvent,
-    ThirdPartyCredentialsJsonConfig,
-    RequiredItemCrit,
-    ItemCritPropHelper,
     ActivityDispatch,
-    HistoricalStatsDisplay
+    CacheConfig,
+    Footer,
+    HistoricalStatsDisplay,
+    ResourceStats,
+    ThirdPartyCredentialsJsonConfig
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
-import Mustache from "mustache";
-import he from "he";
-import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
-import {Submission, Comment, Subreddit, RedditUser} from "snoowrap/dist/objects";
-import {
-    cacheTTLDefaults,
-    createHistoricalDisplayDefaults,
-} from "../Common/defaults";
+import {Comment, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
+import {cacheTTLDefaults, createHistoricalDisplayDefaults,} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs, {Dayjs} from "dayjs";
 import ImageData from "../Common/ImageData";
-import {DataSource, Repository, SelectQueryBuilder, Between, LessThan, DeleteQueryBuilder} from "typeorm";
-import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEvent";
+import {Between, DataSource, DeleteQueryBuilder, LessThan, Repository, SelectQueryBuilder} from "typeorm";
+import {CMEvent as ActionedEventEntity, CMEvent} from "../Common/Entities/CMEvent";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
-import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {CMError, isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
@@ -103,8 +80,6 @@ import {DispatchedEntity} from "../Common/Entities/DispatchedEntity";
 import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
 import {TotalStat} from "../Common/Entities/Stats/TotalStat";
 import {TimeSeriesStat} from "../Common/Entities/Stats/TimeSeriesStat";
-import {InvokeeType} from "../Common/Entities/InvokeeType";
-import {RunStateType} from "../Common/Entities/RunStateType";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
@@ -113,7 +88,6 @@ import {
     asModLogCriteria,
     asModNoteCriteria,
     AuthorCriteria,
-    cmToSnoowrapActivityMap,
     CommentState,
     ModLogCriteria,
     ModNoteCriteria,
@@ -125,19 +99,26 @@ import {
     toFullModLogCriteria,
     toFullModNoteCriteria,
     TypedActivityState,
-    TypedActivityStates,
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySourceValue, ConfigFragmentValidationFunc, DurationVal,
-    EventRetentionPolicyRange, ImageHashCacheData,
+    ActivitySourceValue,
+    ConfigFragmentParseFunc,
+    DurationVal,
+    EventRetentionPolicyRange,
+    ImageHashCacheData,
     JoinOperands,
     ModActionType,
-    ModeratorNameCriteria, ModUserNoteLabel, RelativeDateTimeMatch, statFrequencies, StatisticFrequency,
-    StatisticFrequencyOption, WikiContext
+    ModeratorNameCriteria,
+    ModUserNoteLabel,
+    RelativeDateTimeMatch,
+    statFrequencies,
+    StatisticFrequencyOption,
+    WikiContext
 } from "../Common/Infrastructure/Atomic";
 import {
-    AuthorOptions, FilterCriteriaPropertyResult,
+    AuthorOptions,
+    FilterCriteriaPropertyResult,
     FilterCriteriaResult,
     FilterResult,
     ItemOptions,
@@ -151,20 +132,22 @@ import {
 } from "../Common/Infrastructure/ActivityWindow";
 import {Duration} from "dayjs/plugin/duration";
 import {
-    activityReports,
-
     ActivityType,
     AuthorHistorySort,
-    CachedFetchedActivitiesResult, FetchedActivitiesResult, MaybeActivityType,
-    SnoowrapActivity, SubredditRemovalReason
+    CachedFetchedActivitiesResult,
+    FetchedActivitiesResult,
+    SnoowrapActivity,
+    SubredditRemovalReason
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
 import {
-    compareDurationValue, comparisonTextOp,
+    compareDurationValue,
+    comparisonTextOp,
     parseDurationComparison,
     parseGenericValueComparison,
-    parseGenericValueOrPercentComparison, parseReportComparison
+    parseGenericValueOrPercentComparison,
+    parseReportComparison
 } from "../Common/Infrastructure/Comparisons";
 import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./ModNotes/ModNote";
 import {IncludesData} from "../Common/Infrastructure/Includes";
@@ -173,6 +156,7 @@ import ConfigParseError from "../Utils/ConfigParseError";
 import {ActivityReport} from "../Common/Entities/ActivityReport";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {ActivitySource} from "../Common/ActivitySource";
+import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -191,42 +175,6 @@ interface OldHistoricalStats {
     rulesTriggered: Map<string, number>
     actionsRun: Map<string, number>
     [index: string]: any
-}
-
-export interface SubredditResourceConfig extends Footer {
-    caching?: CacheConfig,
-    subreddit: Subreddit,
-    logger: Logger;
-    client: ExtendedSnoowrap
-    credentials?: ThirdPartyCredentialsJsonConfig
-    managerEntity: ManagerEntity
-    botEntity: Bot
-    statFrequency: StatisticFrequencyOption
-    retention?: EventRetentionPolicyRange
-}
-
-interface SubredditResourceOptions extends Footer {
-    ttl: Required<TTLConfig>
-    cache: Cache
-    cacheType: string;
-    cacheSettingsHash: string
-    subreddit: Subreddit,
-    database: DataSource
-    logger: Logger;
-    client: ExtendedSnoowrap;
-    prefix?: string;
-    actionedEventsMax: number;
-    thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
-    delayedItems?: ActivityDispatch[]
-    botAccount?: string
-    botName: string
-    managerEntity: ManagerEntity
-    botEntity: Bot
-    statFrequency: StatisticFrequencyOption
-    retention?: EventRetentionPolicyRange
-}
-
-export interface SubredditResourceSetOptions extends CacheConfig, Footer {
 }
 
 export class SubredditResources {
@@ -1230,156 +1178,6 @@ export class SubredditResources {
             return val !== undefined && val !== null;
         }
         return false;
-    }
-
-    filterAuthorModActions(modActions: ModNote[], actionCriteria: (ModNoteCriteria | ModLogCriteria), referenceItem: SnoowrapActivity) {
-        const {search = 'current', count = '>= 1'} = actionCriteria;
-
-        const {
-            value,
-            operator,
-            isPercent,
-            duration,
-            extra = ''
-        } = parseGenericValueOrPercentComparison(count);
-
-        const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
-
-        let actionsToUse: ModNote[] = [];
-        if(asModNoteCriteria(actionCriteria)) {
-            actionsToUse = modActions.filter(x => x.type === 'NOTE');
-        } else {
-            actionsToUse = modActions;
-        }
-
-        if(search === 'current' && actionsToUse.length > 0) {
-            actionsToUse = [actionsToUse[0]];
-        }
-
-        let validActions: ModNote[] = [];
-        if (asModLogCriteria(actionCriteria)) {
-            const fullCrit = toFullModLogCriteria(actionCriteria);
-            const fullCritEntries = Object.entries(fullCrit);
-            validActions = actionsToUse.filter(x => {
-
-                // filter out any notes that occur before time range
-                if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
-                    return false;
-                }
-
-                for (const [k, v] of fullCritEntries) {
-                    const key = k.toLocaleLowerCase();
-                    if (['count', 'search'].includes(key)) {
-                        continue;
-                    }
-                    switch (key) {
-                        case 'type':
-                            if (!v.includes((x.type as ModActionType))) {
-                                return false
-                            }
-                            break;
-                        case 'activitytype':
-                            const anyMatch = v.some((a: MaybeActivityType) => {
-                                switch (a) {
-                                    case 'submission':
-                                        return isSubmission(x.action.actedOn);
-                                    case 'comment':
-                                        return isComment(x.action.actedOn);
-                                    case false:
-                                        return x.action.actedOn === undefined || (!asSubmission(x.action.actedOn) && !asComment(x.action.actedOn));
-                                }
-                            });
-                            if (!anyMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'description':
-                        case 'action':
-                        case 'details':
-                            const actionPropVal = x.action[key] as string;
-                            if (actionPropVal === undefined) {
-                                return false;
-                            }
-                            const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
-                            if (!anyPropMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'referencescurrentactivity':
-                            const isCurrentActivity = x.action.actedOn !== undefined && referenceItem !== undefined && x.action.actedOn.name === referenceItem.name;
-                            if((v === true && !isCurrentActivity) || (v === false && isCurrentActivity)) {
-                                return false;
-                            }
-                            break;
-                    } // case end
-
-                } // for each end
-
-                return true;
-            }); // filter end
-        } else if(asModNoteCriteria(actionCriteria)) {
-            const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
-            const fullCritEntries = Object.entries(fullCrit);
-            validActions = actionsToUse.filter(x => {
-
-                // filter out any notes that occur before time range
-                if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
-                    return false;
-                }
-
-                for (const [k, v] of fullCritEntries) {
-                    const key = k.toLocaleLowerCase();
-                    if (['count', 'search'].includes(key)) {
-                        continue;
-                    }
-                    switch (key) {
-                        case 'notetype':
-                            if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
-                                return false
-                            }
-                            break;
-                        case 'note':
-                            const actionPropVal = x.note.note;
-                            if (actionPropVal === undefined) {
-                                return false;
-                            }
-                            const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
-                            if (!anyPropMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'activitytype':
-                            const anyMatch = v.some((a: MaybeActivityType) => {
-                                switch (a) {
-                                    case 'submission':
-                                        return isSubmission(x.action.actedOn);
-                                    case 'comment':
-                                        return isComment(x.action.actedOn);
-                                    case false:
-                                        return x.action.actedOn === undefined || (!asSubmission(x.action.actedOn) && !asComment(x.action.actedOn));
-                                }
-                            });
-                            if (!anyMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'referencescurrentactivity':
-                            const isCurrentActivity = x.action.actedOn !== undefined && referenceItem !== undefined && x.action.actedOn.id === referenceItem.name;
-                            if((v === true && !isCurrentActivity) || (v === false && isCurrentActivity)) {
-                                return false;
-                            }
-                            break;
-                    } // case end
-
-                } // for each end
-
-                return true;
-            }); // filter end
-        } else {
-            throw new SimpleError(`Could not determine if a modActions criteria was for Mod Log or Mod Note. Given: ${JSON.stringify(actionCriteria)}`);
-        }
-
-        return [validActions, actionsToUse];
     }
 
     async getAuthorModNotesByActivityAuthor(activity: Comment | Submission) {
@@ -2815,22 +2613,13 @@ export class SubredditResources {
                     case 'flairTemplate':
                     case 'link_flair_text':
                     case 'link_flair_css_class':
-                    case 'link_flair_background_color':
-                    case 'authorFlairText':
-                    case 'authorFlairCssClass':
-                    case 'authorFlairTemplateId':
-                    case 'authorFlairBackgroundColor':
-
-                        let actualPropName = cmToSnoowrapActivityMap[k] ?? k;
-
-                        if(!asSubmission(item) && (actualPropName as string).includes('link_flair')) {
-                            propResultsMap[k]!.passed = true;
-                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
-                            log.warn(`Cannot test for ${k} on Comment`);
-                            break;
-                        } else {
-                            // @ts-ignore
-                            let propertyValue: string | null = await item[actualPropName];
+                        if(asSubmission(item)) {
+                            let propertyValue: string | null;
+                            if(k === 'flairTemplate') {
+                                propertyValue = await item.link_flair_template_id;
+                            } else {
+                                propertyValue = await item[k];
+                            }
 
                             propResultsMap[k]!.found = propertyValue;
 
@@ -2844,37 +2633,14 @@ export class SubredditResources {
                                 // if crit is not a boolean but property is "empty" then it'll never pass anyway
                                 propResultsMap[k]!.passed = !include;
                             } else {
-                                // remove # if comparing hex values
-                                const isHex = k.toLowerCase().includes('background');
-
-                                const expectedValues = (typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[])).map(x => isHex ? x.replace('#','').trim() : x.trim());
-                                const cleanProp = isHex ? propertyValue.replace('#','').trim() : propertyValue.trim();
-                                let anyPassed = false;
-                                const errorReasons = [];
-                                for(const expectedVal of expectedValues) {
-                                    try {
-                                        const [regPassed] = testMaybeStringRegex(expectedVal,cleanProp);
-                                        if(regPassed) {
-                                            anyPassed = true;
-                                        }
-                                    } catch (err: any) {
-                                        if(err.message.includes('Could not convert test value')) {
-                                            errorReasons.push(`Could not convert ${expectedVal} to Regex, fallback to simple case-insenstive comparison`);
-                                            // fallback to simple comparison
-                                            anyPassed = expectedVal.toLowerCase() === cleanProp.toLowerCase();
-                                        } else {
-                                            errorReasons.push(err.message);
-                                        }
-                                    }
-                                    if(anyPassed) {
-                                        break;
-                                    }
-                                }
-                                if(errorReasons.length > 0) {
-                                    propResultsMap[k]!.reason = `Some errors occurred while testing: ${errorReasons.join(' | ')}`;
-                                }
-                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(anyPassed, include);
+                                const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
+                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase()), include);
                             }
+                            break;
+                        } else {
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
+                            log.warn(`Cannot test for ${k} on Comment`);
                             break;
                         }
                     default:
@@ -3325,6 +3091,7 @@ export class SubredditResources {
 
                                     const {search = 'current', count = '>= 1'} = actionCriteria;
 
+
                                     const {
                                         value,
                                         operator,
@@ -3332,10 +3099,146 @@ export class SubredditResources {
                                         duration,
                                         extra = ''
                                     } = parseGenericValueOrPercentComparison(count);
+                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
 
-                                    const [validActions, actionsToUse] = this.filterAuthorModActions(modActions, actionCriteria, item);
+                                    let actionsToUse: ModNote[] = [];
+                                    if(asModNoteCriteria(actionCriteria)) {
+                                        actionsToUse = actionsToUse.filter(x => x.type === 'NOTE');
+                                    } else {
+                                        actionsToUse = modActions;
+                                    }
+
+                                    if(search === 'current' && actionsToUse.length > 0) {
+                                        actionsToUse = [actionsToUse[0]];
+                                    }
+
+                                    let validActions: ModNote[] = [];
+                                    if (asModLogCriteria(actionCriteria)) {
+                                        const fullCrit = toFullModLogCriteria(actionCriteria);
+                                        const fullCritEntries = Object.entries(fullCrit);
+                                        validActions = actionsToUse.filter(x => {
+
+                                            // filter out any notes that occur before time range
+                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                                                return false;
+                                            }
+
+                                            for (const [k, v] of fullCritEntries) {
+                                                const key = k.toLocaleLowerCase();
+                                                if (['count', 'search'].includes(key)) {
+                                                    continue;
+                                                }
+                                                switch (key) {
+                                                    case 'type':
+                                                        if (!v.includes((x.type as ModActionType))) {
+                                                            return false
+                                                        }
+                                                        break;
+                                                    case 'activitytype':
+                                                        const anyMatch = v.some((a: ActivityType) => {
+                                                            switch (a) {
+                                                                case 'submission':
+                                                                    if (x.action.actedOn instanceof Submission) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                                case 'comment':
+                                                                    if (x.action.actedOn instanceof Comment) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                            }
+                                                        });
+                                                        if (!anyMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
+                                                    case 'description':
+                                                    case 'action':
+                                                    case 'details':
+                                                        const actionPropVal = x.action[key] as string;
+                                                        if (actionPropVal === undefined) {
+                                                            return false;
+                                                        }
+                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                                                        if (!anyPropMatch) {
+                                                            return false;
+                                                        }
+                                                } // case end
+
+                                            } // for each end
+
+                                            return true;
+                                        }); // filter end
+                                    } else if(asModNoteCriteria(actionCriteria)) {
+                                        const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
+                                        const fullCritEntries = Object.entries(fullCrit);
+                                        validActions = actionsToUse.filter(x => {
+
+                                            // filter out any notes that occur before time range
+                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                                                return false;
+                                            }
+
+                                            for (const [k, v] of fullCritEntries) {
+                                                const key = k.toLocaleLowerCase();
+                                                if (['count', 'search'].includes(key)) {
+                                                    continue;
+                                                }
+                                                switch (key) {
+                                                    case 'notetype':
+                                                        if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
+                                                            return false
+                                                        }
+                                                        break;
+                                                    case 'note':
+                                                        const actionPropVal = x.note.note;
+                                                        if (actionPropVal === undefined) {
+                                                            return false;
+                                                        }
+                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                                                        if (!anyPropMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
+                                                    case 'activitytype':
+                                                        const anyMatch = v.some((a: ActivityType) => {
+                                                            switch (a) {
+                                                                case 'submission':
+                                                                    if (x.action.actedOn instanceof Submission) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                                case 'comment':
+                                                                    if (x.action.actedOn instanceof Comment) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                            }
+                                                        });
+                                                        if (!anyMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
+                                                } // case end
+
+                                            } // for each end
+
+                                            return true;
+                                        }); // filter end
+                                    } else {
+                                        throw new SimpleError(`Could not determine if a modActions criteria was for Mod Log or Mod Note. Given: ${JSON.stringify(actionCriteria)}`);
+                                    }
 
                                     switch (search) {
+                                        case 'current':
+                                            if (validActions.length === 0) {
+                                                actionResult.push('No Mod Actions present');
+                                            } else {
+                                                actionResult.push('Current Action matches criteria');
+                                                return true;
+                                            }
+                                            break;
                                         case 'consecutive':
                                             if (isPercent) {
                                                 throw new SimpleError(`When comparing Mod Actions with 'search: consecutive' the 'count' value cannot be a percentage. Given: ${count}`);
@@ -3362,11 +3265,10 @@ export class SubredditResources {
                                                 return true;
                                             }
                                             break;
-                                        case 'current':
                                         case 'total':
                                             if (isPercent) {
                                                 // avoid divide by zero
-                                                const percent = actionsToUse.length === 0 ? 0 : validActions.length / actionsToUse.length;
+                                                const percent = notes.length === 0 ? 0 : validActions.length / actionsToUse.length;
                                                 actionResult.push(`${formatNumber(percent)}% of ${actionsToUse.length} matched criteria`);
                                                 if (comparisonTextOp(percent, operator, value / 100)) {
                                                     return true;
@@ -3537,237 +3439,6 @@ export class SubredditResources {
 
     async getSubredditRemovalReasonById(id: string): Promise<SubredditRemovalReason | undefined> {
         return (await this.getSubredditRemovalReasons()).find(x => x.id === id);
-    }
-}
-
-export class BotResourcesManager {
-    resources: Map<string, SubredditResources> = new Map();
-    authorTTL: number = 10000;
-    enabled: boolean = true;
-    modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
-    defaultCache: Cache;
-    defaultCacheConfig: StrongCache
-    defaultCacheMigrated: boolean = false;
-    cacheType: string = 'none';
-    cacheHash: string;
-    ttlDefaults: Required<TTLConfig>;
-    actionedEventsMaxDefault?: number;
-    actionedEventsDefault: number;
-    pruneInterval: any;
-    defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
-    logger: Logger;
-    botAccount?: string;
-    defaultDatabase: DataSource
-    botName!: string
-    retention?: EventRetentionPolicyRange
-
-    invokeeRepo: Repository<InvokeeType>
-    runTypeRepo: Repository<RunStateType>
-
-    constructor(config: BotInstanceConfig, logger: Logger) {
-        const {
-            caching: {
-                authorTTL,
-                userNotesTTL,
-                wikiTTL,
-                commentTTL,
-                submissionTTL,
-                subredditTTL,
-                filterCriteriaTTL,
-                modNotesTTL,
-                selfTTL,
-                provider,
-                actionedEventsMax,
-                actionedEventsDefault,
-            },
-            name,
-            credentials: {
-                reddit,
-                ...thirdParty
-            },
-            database,
-            databaseConfig: {
-                retention
-            } = {},
-            caching,
-        } = config;
-        caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
-        const {actionedEventsMax: eMax, actionedEventsDefault: eDef, ...relevantCacheSettings} = caching;
-        this.cacheHash = objectHash.sha1(relevantCacheSettings);
-        this.defaultCacheConfig = caching;
-        this.defaultThirdPartyCredentials = thirdParty;
-        this.defaultDatabase = database;
-        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL, modNotesTTL};
-        this.botName = name as string;
-        this.logger = logger;
-        this.invokeeRepo = this.defaultDatabase.getRepository(InvokeeType);
-        this.runTypeRepo = this.defaultDatabase.getRepository(RunStateType);
-        this.retention = retention;
-
-        const options = provider;
-        this.cacheType = options.store;
-        this.actionedEventsMaxDefault = actionedEventsMax;
-        this.actionedEventsDefault = actionedEventsDefault;
-        this.defaultCache = createCacheManager(options);
-        if (this.cacheType === 'memory') {
-            const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
-            if (min > 0) {
-                // set default prune interval
-                this.pruneInterval = setInterval(() => {
-                    // @ts-ignore
-                    this.defaultCache?.store.prune();
-                    // kinda hacky but whatever
-                    const logger = winston.loggers.get('app');
-                    logger.debug('Pruned Shared Cache');
-                    // prune interval should be twice the smallest TTL
-                }, min * 1000 * 2)
-            }
-        }
-    }
-
-    get(subName: string): SubredditResources | undefined {
-        if (this.resources.has(subName)) {
-            return this.resources.get(subName) as SubredditResources;
-        }
-        return undefined;
-    }
-
-    async set(subName: string, initOptions: SubredditResourceConfig): Promise<SubredditResources> {
-        let hash = 'default';
-        const { caching, credentials, retention, ...init } = initOptions;
-
-        // const bEntity = await this.defaultDatabase.getRepository(Bot).findOne({where: {name: this.botName}}) as Bot;
-        // //const subreddit = this.defaultDatabase.getRepository(SubredditEntity).findOne({name: initOptions.subreddit.display_name});
-        // const mEntity = await this.defaultDatabase.getRepository(Manager).findOne({
-        //     where: {
-        //         name: subName,
-        //         bot: {
-        //             id: bEntity.id
-        //         }
-        //     },
-        //     relations: ['bot']
-        // });
-
-        let opts: SubredditResourceOptions = {
-            cache: this.defaultCache,
-            cacheType: this.cacheType,
-            cacheSettingsHash: hash,
-            ttl: this.ttlDefaults,
-            thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
-            prefix: this.defaultCacheConfig.provider.prefix,
-            actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
-            database: this.defaultDatabase,
-            botName: this.botName,
-            retention: retention ?? this.retention,
-            ...init,
-        };
-
-        if(caching !== undefined) {
-            const {provider = this.defaultCacheConfig.provider, actionedEventsMax = this.actionedEventsDefault, ...rest} = caching;
-            let cacheConfig = {
-                provider: buildCacheOptionsFromProvider(provider),
-                ttl: {
-                    ...this.ttlDefaults,
-                    ...rest
-                },
-            }
-            hash = objectHash.sha1(cacheConfig);
-            // only need to create private if there settings are actually different than the default
-            if(hash !== this.cacheHash) {
-                const {provider: trueProvider, ...trueRest} = cacheConfig;
-                const defaultPrefix = trueProvider.prefix;
-                const subPrefix = defaultPrefix === this.defaultCacheConfig.provider.prefix ? buildCachePrefix([(defaultPrefix !== undefined ? defaultPrefix.replace('SHARED', '') : defaultPrefix), subName]) : trueProvider.prefix;
-                trueProvider.prefix = subPrefix;
-                const eventsMax = this.actionedEventsMaxDefault !== undefined ? Math.min(actionedEventsMax, this.actionedEventsMaxDefault) : actionedEventsMax;
-                opts = {
-                    cache: createCacheManager(trueProvider),
-                    actionedEventsMax: eventsMax,
-                    cacheType: trueProvider.store,
-                    cacheSettingsHash: hash,
-                    thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
-                    prefix: subPrefix,
-                    botName: this.botName,
-                    database: this.defaultDatabase,
-                    retention: retention ?? this.retention,
-                    ...init,
-                    ...trueRest,
-                };
-                await runMigrations(opts.cache, opts.logger, trueProvider.prefix);
-            }
-        } else if(!this.defaultCacheMigrated) {
-            await runMigrations(this.defaultCache, this.logger, opts.prefix);
-            this.defaultCacheMigrated = true;
-        }
-
-        let resource: SubredditResources;
-        const res = this.get(subName);
-        if(res === undefined || res.cacheSettingsHash !== hash) {
-            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems, botAccount: this.botAccount});
-            await resource.initStats();
-            resource.setHistoricalSaveInterval();
-            this.resources.set(subName, resource);
-        } else {
-            // just set non-cache related settings
-            resource = res;
-            resource.botAccount = this.botAccount;
-            if(opts.footer !== resource.footer) {
-                resource.footer = opts.footer || DEFAULT_FOOTER;
-            }
-            // reset cache stats when configuration is reloaded
-            resource.stats.cache = cacheStats();
-        }
-        await resource.initDatabaseDelayedActivities();
-
-        return resource;
-    }
-
-    async destroy(subName: string) {
-        const res = this.get(subName);
-        if(res !== undefined) {
-            await res.destroy();
-            this.resources.delete(subName);
-        }
-    }
-
-    async getPendingSubredditInvites(): Promise<(string[])> {
-        const subredditNames = await this.defaultCache.get(`modInvites`);
-        if (subredditNames !== undefined && subredditNames !== null) {
-            return subredditNames as string[];
-        }
-        return [];
-    }
-
-    async addPendingSubredditInvite(subreddit: string): Promise<void> {
-        if(subreddit === null || subreddit === undefined || subreddit == '') {
-            throw new CMError('Subreddit name cannot be empty');
-        }
-        let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
-        if (subredditNames === undefined || subredditNames === null) {
-            subredditNames = [];
-        }
-        const cleanName = subreddit.trim();
-
-        if(subredditNames.some(x => x.trim().toLowerCase() === cleanName.toLowerCase())) {
-            throw new CMError(`An invite for the Subreddit '${subreddit}' already exists`);
-        }
-        subredditNames.push(cleanName);
-        await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
-        return;
-    }
-
-    async deletePendingSubredditInvite(subreddit: string): Promise<void> {
-        let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
-        if (subredditNames === undefined || subredditNames === null) {
-            subredditNames = [];
-        }
-        subredditNames = subredditNames.filter(x => x.toLowerCase() !== subreddit.trim().toLowerCase());
-        await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
-        return;
-    }
-
-    async clearPendingSubredditInvites(): Promise<void> {
-        await this.defaultCache.del(`modInvites`);
-        return;
     }
 }
 
