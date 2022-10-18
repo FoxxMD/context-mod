@@ -20,3 +20,10 @@ Which can then be used in conjunction with a [`window`](https://github.com/FoxxM
 * Trigger if there are 5 regex matches in the Author's last 10 comments - [YAML](/docs/subreddit/components/regex/matchSubsetHistoryActivity.yaml) | [JSON](/docs/subreddit/components/regex/matchSubsetHistoryActivity.json5)
 * Remove comments that are spamming discord links - [YAML](/docs/subreddit/components/regex/removeDiscordSpam.yaml) | [JSON](/docs/subreddit/components/regex/removeDiscordSpam.json5)
   * Differs from just using automod because this config can allow one-off/organic links from users who DO NOT spam discord links but will still remove the comment if the user is spamming them
+
+# [Template Variables](/docs/subreddit/actionTemplating.md)
+
+|     Name      |                       Description                       |                                                               Example                                                                |
+|---------------|---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `result`      | Summary of rule results (also found in Actioned Events) | Criteria 1 ✓ -- Activity Match ✓ => 1 > 0 (Threshold > 0) and 1 Total Matches (Window: 1 Item) -- Matched Values: "example.com/test" |
+| `matchSample` | A comma-delimited list of matches from activities       | "example.com/test"                                                                                                                   |

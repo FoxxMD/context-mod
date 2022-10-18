@@ -116,6 +116,16 @@ rules:
       criteria: #... if specified, overrides parent-level criteria
 ```
 
+# [Template Variables](/docs/subreddit/actionTemplating.md)
+
+
+|      Name       |                                  Description                                  | Example                                                                                                                                                |
+|-----------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `result`        | Summary of rule results (also found in Actioned Events)                       | Current Activity MHS Test: ✓ Confidence test (>= 90) PASSED MHS confidence of 99.85%   Flagged pass condition of true (toxic) MATCHED MHS flag 'toxic' |
+| `window`        | Number or duration of Activities considered from window                       | 1 activities                                                                                                                                           |
+| `criteriaTest`  | MHS value to test against                                                     | MHS confidence is > 95%                                                                                                                                |
+| `totalMatching` | Total number of activities (current + historical) that matched `criteriaTest` | 1                                                                                                                                                      |
+
 # Examples
 
 Report if MHS flags as toxic
