@@ -95,7 +95,7 @@ The Retention Policy can be specified at operator level, bot, subreddit *overrid
 operator:  
   name: u/MyRedditAccount
 databaseConfig:
-  retention: '3 months' # each subreddit will retain 3 more of recorded events
+  retention: '3 months' # each subreddit will retain 3 months of recorded events
 bots:
     # all subreddits this bot moderates will have 3 month retention
   - name: u/OneBotAccount
