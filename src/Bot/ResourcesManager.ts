@@ -147,7 +147,7 @@ export class BotResourcesManager {
             } else if(res !== undefined && res.cache.equalProvider(candidateProvider)) {
                 opts.cache = res.cache;
             } else {
-                opts.cache = new CMCache(createCacheManager(candidateProvider), candidateProvider, false, opts.ttl, this.logger, candidateProvider.prefix);
+                opts.cache = new CMCache(createCacheManager(candidateProvider), candidateProvider, false, opts.ttl, this.logger);
                 await runMigrations(opts.cache.cache, opts.cache.logger, candidateProvider.prefix);
             }
 

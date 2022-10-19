@@ -23,7 +23,7 @@ export const buildCacheOptionsFromProvider = (provider: CacheProvider | any): Ca
     }
 }
 export const createCacheManager = (options: CacheOptions): Cache => {
-    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db, ...rest} = options;
+    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db, prefix, ...rest} = options;
     switch (store) {
         case 'none':
             return cacheManager.caching({store: 'none', max, ttl});
@@ -52,11 +52,11 @@ export class CMCache {
     providerOptions: CacheOptions;
     logger!: Logger;
 
-    constructor(cache: Cache, providerOptions: CacheOptions, defaultCache: boolean, ttls: Partial<StrongTTLConfig>, logger: Logger, prefix?: string) {
+    constructor(cache: Cache, providerOptions: CacheOptions, defaultCache: boolean, ttls: Partial<StrongTTLConfig>, logger: Logger) {
         this.cache = cache;
         this.providerOptions = providerOptions
-        this.prefix = prefix;
         this.isDefaultCache = defaultCache;
+        this.prefix = this.providerOptions.prefix ?? '';
 
         this.setLogger(logger);
 
@@ -176,11 +176,11 @@ export class CMCache {
     }
 
     del(key: string): Promise<any> {
-        return this.cache.del(key);
+        return this.cache.del(`${this.prefix}${key}`);
     }
 
     get<T>(key: string): Promise<T | undefined> {
-        return this.cache.get(key);
+        return this.cache.get(`${this.prefix}${key}`);
     }
 
     reset(): Promise<void> {
@@ -188,10 +188,11 @@ export class CMCache {
     }
 
     set<T>(key: string, value: T, options?: CachingConfig): Promise<T> {
-        return this.cache.set(key, value, options);
+        return this.cache.set(`${this.prefix}${key}`, value, options);
     }
 
     wrap<T>(...args: WrapArgsType<T>[]): Promise<T> {
+        args[0] = `${this.prefix}${args[0]}`;
         return this.cache.wrap(...args);
     }
 

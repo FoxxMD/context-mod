@@ -791,6 +791,11 @@ export interface CacheOptions {
      * */
     max?: number
 
+    /**
+     * A prefix to add to all keys
+     * */
+    prefix?: string
+
     [key:string]: any
 }
 

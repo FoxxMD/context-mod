@@ -474,6 +474,10 @@
                     ],
                     "type": "number"
                 },
+                "prefix": {
+                    "description": "A prefix to add to all keys",
+                    "type": "string"
+                },
                 "store": {
                     "$ref": "#/definitions/CacheProvider"
                 },
