@@ -1467,14 +1467,14 @@ export class SubredditResources {
         return this.renderContent(footer, item);
     }
 
-    async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentParseFunc): Promise<T> {
+    async getConfigFragment<T>(includesData: IncludesData, parseFunc?: ConfigFragmentParseFunc): Promise<T> {
 
         const {
             path,
-            ttl = this.ttl.wikiTTL,
+            ttl = 60,
         } = includesData;
 
-        const {val: configStr, fromCache, hash, response} = await this.getExternalResource(path);
+        const {val: configStr, fromCache, hash, response} = await this.getExternalResource(path, {shared: true});
 
         const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(configStr);
         if (configObj === undefined) {
@@ -1484,23 +1484,22 @@ export class SubredditResources {
             throw new ConfigParseError(`Could not parse includes URL of '${configStr}' contents as JSON or YAML.`)
         }
 
-        // if its from cache then we know the data is valid
-        if(fromCache) {
-            this.logger.verbose(`Got Config Fragment ${path} from cache`);
-            return configObj.toJS() as unknown as T;
-        }
-
         const rawData = configObj.toJS();
         let validatedData: T;
         // otherwise now we want to validate it if a function is present
-        if(validateFunc !== undefined) {
+        if(parseFunc !== undefined) {
             try {
-                validatedData = validateFunc(configObj.toJS(), fromCache) as unknown as T;
+                validatedData = parseFunc(configObj.toJS(), fromCache) as unknown as T;
             } catch (e) {
                 throw e;
             }
         } else {
             validatedData = rawData as unknown as T;
+        }
+
+        if(fromCache) {
+            this.logger.verbose(`Got Config Fragment ${path} from cache`);
+            return validatedData as unknown as T;
         }
 
         let ttlVal: number | false = this.ttl.wikiTTL;
@@ -1545,13 +1544,13 @@ export class SubredditResources {
                     }
                 } else {
                     // couldn't get a cache header, fallback
-                    ttlVal = this.ttl.wikiTTL;
+                    ttlVal = 60;
                 }
             }
         }
 
         if (ttlVal !== false) {
-            this.cache.set(hash as string, configStr, {ttl: ttlVal});
+            this.cache.set(hash as string, configStr, {ttl: ttlVal, shared: true});
         }
 
         return validatedData;
