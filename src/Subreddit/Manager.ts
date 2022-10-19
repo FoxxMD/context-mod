@@ -380,7 +380,7 @@ export class Manager extends EventEmitter implements RunningStates {
 
         this.eventsSampleInterval = setInterval((function(self) {
             return function() {
-                const et = self.resources !== undefined ? self.resources.stats.historical.eventsCheckedTotal : 0;
+                const et = self.resources !== undefined ? self.resources.subredditStats.stats.historical.eventsCheckedTotal : 0;
                 const rollingSample = self.eventsSample.slice(0, 7)
                 rollingSample.unshift(et)
                 self.eventsSample = rollingSample;
@@ -402,7 +402,7 @@ export class Manager extends EventEmitter implements RunningStates {
         this.rulesUniqueSampleInterval = setInterval((function(self) {
             return function() {
                 const rollingSample = self.rulesUniqueSample.slice(0, 7)
-                const rt = self.resources !== undefined ? self.resources.stats.historical.rulesRunTotal - self.resources.stats.historical.rulesCachedTotal : 0;
+                const rt = self.resources !== undefined ? self.resources.subredditStats.stats.historical.rulesRunTotal - self.resources.subredditStats.stats.historical.rulesCachedTotal : 0;
                 rollingSample.unshift(rt);
                 self.rulesUniqueSample = rollingSample;
                 const diff = self.rulesUniqueSample.reduceRight((acc: number[], curr, index) => {

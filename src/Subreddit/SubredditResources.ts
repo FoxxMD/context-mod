@@ -157,25 +157,9 @@ import {ActivityReport} from "../Common/Entities/ActivityReport";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {ActivitySource} from "../Common/ActivitySource";
 import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
+import {SubredditStats} from "./Stats";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
-
-/**
- * Only used for migrating stats from cache to db
- * */
-interface OldHistoricalStats {
-    eventsCheckedTotal: number
-    eventsActionedTotal: number
-    checksRun: Map<string, number>
-    checksFromCache: Map<string, number>
-    checksTriggered: Map<string, number>
-    rulesRun: Map<string, number>
-    //rulesCached: Map<string, number>
-    rulesCachedTotal: number
-    rulesTriggered: Map<string, number>
-    actionsRun: Map<string, number>
-    [index: string]: any
-}
 
 export class SubredditResources {
     
@@ -194,7 +178,6 @@ export class SubredditResources {
     cacheType: string
     cacheSettingsHash?: string;
     pruneInterval?: any;
-    historicalSaveInterval?: any;
     prefix?: string
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
@@ -202,20 +185,11 @@ export class SubredditResources {
     botAccount?: string;
     dispatchedActivityRepo: Repository<DispatchedEntity>
     activitySourceRepo: Repository<ActivitySourceEntity>
-    totalStatsRepo: Repository<TotalStat>
-    totalStatsEntities?: TotalStat[];
-    tsStatsRepo: Repository<TimeSeriesStat>
-    timeSeriesStatsEntities?: TimeSeriesStat[];
-    statFrequency: StatisticFrequencyOption
     retention?: EventRetentionPolicyRange
     managerEntity: ManagerEntity
     botEntity: Bot
-
-    stats: {
-        cache: ResourceStats
-        historical: HistoricalStatsDisplay
-        timeSeries: HistoricalStatsDisplay
-    };
+    
+    subredditStats: SubredditStats
 
     constructor(name: string, options: SubredditResourceOptions) {
         const {
@@ -258,9 +232,6 @@ export class SubredditResources {
         this.database = database;
         this.dispatchedActivityRepo = this.database.getRepository(DispatchedEntity);
         this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
-        this.totalStatsRepo = this.database.getRepository(TotalStat);
-        this.tsStatsRepo = this.database.getRepository(TimeSeriesStat);
-        this.statFrequency = statFrequency;
         this.retention = retention;
         this.prefix = prefix;
         this.client = client;
@@ -288,16 +259,10 @@ export class SubredditResources {
             this.logger = logger.child({labels: ['Resources']}, mergeArr);
         }
 
-        this.stats = {
-            cache: cacheStats(),
-            historical: createHistoricalDisplayDefaults(),
-            timeSeries: createHistoricalDisplayDefaults(),
-        };
+        this.subredditStats = new SubredditStats(database, managerEntity, cache, statFrequency, this.logger);
 
         const cacheUseCB = (miss: boolean) => {
-            this.stats.cache.userNotes.requestTimestamps.push(Date.now());
-            this.stats.cache.userNotes.requests++;
-            this.stats.cache.userNotes.miss += miss ? 1 : 0;
+            this.subredditStats.incrementCacheTypeStat('userNotes', undefined, miss);
         }
         this.userNotes = new UserNotes(userNotesTTL, this.subreddit.display_name, this.client, this.logger, this.cache, cacheUseCB)
 
@@ -330,13 +295,11 @@ export class SubredditResources {
     }
 
     async destroy() {
-        if(this.historicalSaveInterval !== undefined) {
-            clearInterval(this.historicalSaveInterval);
-        }
         if(this.pruneInterval !== undefined && this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
             clearInterval(this.pruneInterval);
             this.cache?.reset();
         }
+        await this.subredditStats.destroy();
     }
 
     async retentionCleanup() {
@@ -479,168 +442,19 @@ export class SubredditResources {
     }
 
     async initStats() {
-        // temp migration strategy to transition from cache to db
-        try {
-            let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
-            const totalStats = await this.totalStatsRepo.findBy({managerId: this.managerEntity.id});
-            if (totalStats.length === 0) {
-                const at = await this.cache.get(`${this.name}-historical-allTime`) as null | undefined | OldHistoricalStats;
-                if (at !== null && at !== undefined) {
-                    // convert to historical stat object
-                    const rehydratedAt: any = {};
-                    for (const [k, v] of Object.entries(at)) {
-                        const t = typeof v;
-                        if (t === 'number') {
-                            // simple number stat like eventsCheckedTotal
-                            rehydratedAt[k] = v;
-                        } else if (Array.isArray(v)) {
-                            // a map stat that we have data for is serialized as an array of KV pairs
-                            const statMap = new Map(v);
-                            // @ts-ignore
-                            rehydratedAt[`${k}Total`] = Array.from(statMap.values()).reduce((acc, curr) => acc + curr, 0)
-                        } else if (v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
-                            // a map stat that was not serialized (for some reason) or serialized without any data
-                            rehydratedAt[k] = 0;
-                        } else {
-                            // ???? shouldn't get here
-                            this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
-                            rehydratedAt[k] = v;
-                        }
-                    }
-                    currentStats = rehydratedAt as HistoricalStatsDisplay;
-                }
-                const now = dayjs();
-                const statEntities: TotalStat[] = [];
-                for (const [k, v] of Object.entries(currentStats)) {
-                    statEntities.push(new TotalStat({
-                        metric: k,
-                        value: v,
-                        manager: this.managerEntity,
-                        createdAt: now,
-                    }));
-                }
-                await this.totalStatsRepo.save(statEntities);
-                this.totalStatsEntities = statEntities;
-            } else {
-                this.totalStatsEntities = totalStats;
-                for (const [k, v] of Object.entries(currentStats)) {
-                    const matchedStat = totalStats.find(x => x.metric === k);
-                    if (matchedStat !== undefined) {
-                        currentStats[k] = matchedStat.value;
-                    } else {
-                        this.logger.warn(`Could not find historical stat matching '${k}' in the database, will default to 0`);
-                        currentStats[k] = v;
-                    }
-                }
-            }
-            this.stats.historical = currentStats;
-        } catch (e) {
-            this.logger.error(new ErrorWithCause('Failed to init historical stats', {cause: e}));
-        }
-
-        try {
-            if(this.statFrequency !== false) {
-                let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
-                let startRange = dayjs().set('second', 0);
-                for(const unit of statFrequencies) {
-                    if(unit !== 'week' && !frequencyEqualOrLargerThanMin(unit, this.statFrequency)) {
-                        startRange = startRange.set(unit, 0);
-                    }
-                    if(unit === 'week' && this.statFrequency === 'week') {
-                        // make sure we get beginning of week
-                        startRange = startRange.week(startRange.week());
-                    }
-                }
-                // set end range by +1 of whatever unit we are using
-                const endRange = this.statFrequency === 'week' ? startRange.clone().week(startRange.week() + 1) : startRange.clone().set(this.statFrequency, startRange.get(this.statFrequency) + 1);
-
-                const tsStats = await this.tsStatsRepo.findBy({
-                    managerId: this.managerEntity.id,
-                    granularity: this.statFrequency,
-                    // make sure its inclusive!
-                    _createdAt: Between(startRange.clone().subtract(1, 'second').toDate(), endRange.clone().add(1, 'second').toDate())
-                });
-
-                if(tsStats.length === 0) {
-                    const statEntities: TimeSeriesStat[] = [];
-                    for (const [k, v] of Object.entries(currentStats)) {
-                        statEntities.push(new TimeSeriesStat({
-                            metric: k,
-                            value: v,
-                            granularity: this.statFrequency,
-                            manager: this.managerEntity,
-                            createdAt: startRange,
-                        }));
-                    }
-                    this.timeSeriesStatsEntities = statEntities;
-                } else {
-                    this.timeSeriesStatsEntities = tsStats;
-                }
-
-                for (const [k, v] of Object.entries(currentStats)) {
-                    const matchedStat = this.timeSeriesStatsEntities.find(x => x.metric === k);
-                    if (matchedStat !== undefined) {
-                        currentStats[k] = matchedStat.value;
-                    } else {
-                        this.logger.warn(`Could not find time series stat matching '${k}' in the database, will default to 0`);
-                        currentStats[k] = v;
-                    }
-                }
-            }
-        } catch (e) {
-            this.logger.error(new ErrorWithCause('Failed to init frequency (time series) stats', {cause: e}));
-        }
+        return this.subredditStats.initStats();
     }
 
     updateHistoricalStats(data: Partial<HistoricalStatsDisplay>) {
-        for(const [k, v] of Object.entries(data)) {
-            if(this.stats.historical[k] !== undefined && v !== undefined) {
-                this.stats.historical[k] += v;
-            }
-            if(this.stats.timeSeries[k] !== undefined && v !== undefined) {
-                this.stats.timeSeries[k] += v;
-            }
-        }
+        this.subredditStats.updateHistoricalStats(data);
     }
 
     getHistoricalDisplayStats(): HistoricalStatsDisplay {
-        return this.stats.historical;
-    }
-
-    async saveHistoricalStats() {
-        if(this.totalStatsEntities !== undefined) {
-            for(const [k, v] of Object.entries(this.stats.historical)) {
-                const matchedStatIndex = this.totalStatsEntities.findIndex(x => x.metric === k);
-                if(matchedStatIndex !== -1) {
-                    this.totalStatsEntities[matchedStatIndex].value = v;
-                } else {
-                    this.logger.warn(`Could not find historical stat matching '${k}' in total stats??`);
-                }
-
-            }
-            await this.totalStatsRepo.save(this.totalStatsEntities);
-        }
-
-        if(this.timeSeriesStatsEntities !== undefined) {
-            for(const [k, v] of Object.entries(this.stats.timeSeries)) {
-                const matchedStatIndex = this.timeSeriesStatsEntities.findIndex(x => x.metric === k);
-                if(matchedStatIndex !== -1) {
-                    this.timeSeriesStatsEntities[matchedStatIndex].value = v;
-                } else {
-                    this.logger.warn(`Could not find time series stat matching '${k}' in total stats??`);
-                }
-
-            }
-            await this.tsStatsRepo.save(this.timeSeriesStatsEntities);
-        }
+        return this.subredditStats.getHistoricalDisplayStats();
     }
 
     setHistoricalSaveInterval() {
-        this.historicalSaveInterval = setInterval((function(self) {
-            return async () => {
-                await self.saveHistoricalStats();
-            }
-        })(this),10000);
+        this.subredditStats.setHistoricalSaveInterval();
     }
 
     async getCacheKeyCount() {
@@ -737,66 +551,11 @@ export class SubredditResources {
     }
 
     getCacheTotals() {
-        return Object.values(this.stats.cache).reduce((acc, curr) => ({
-            miss: acc.miss + curr.miss,
-            req: acc.req + curr.requests,
-        }), {miss: 0, req: 0});
+        return this.subredditStats.getCacheTotals();
     }
 
     async getStats() {
-        const totals = this.getCacheTotals();
-        const cacheKeys = Object.keys(this.stats.cache);
-        const res = {
-            cache: {
-                // TODO could probably combine these two
-                totalRequests: totals.req,
-                totalMiss: totals.miss,
-                missPercent: `${formatNumber(totals.miss === 0 || totals.req === 0 ? 0 :(totals.miss/totals.req) * 100, {toFixed: 0})}%`,
-                types: await cacheKeys.reduce(async (accProm, curr) => {
-                    const acc = await accProm;
-                    // calculate miss percent
-
-                    const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
-                    acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
-
-                    // calculate average identifier hits
-
-                    const idCache = acc[curr].identifierRequestCount;
-                    // @ts-expect-error
-                    const idKeys = await idCache.store.keys() as string[];
-                    if(idKeys.length > 0) {
-                        let hits = 0;
-                        for (const k of idKeys) {
-                            hits += await idCache.get(k) as number;
-                        }
-                        acc[curr].identifierAverageHit = formatNumber(hits/idKeys.length);
-                    }
-
-                    if(acc[curr].requestTimestamps.length > 1) {
-                        // calculate average time between request
-                        const diffData = acc[curr].requestTimestamps.reduce((accTimestampData, curr: number) => {
-                            if(accTimestampData.last === 0) {
-                                accTimestampData.last = curr;
-                                return accTimestampData;
-                            }
-                            accTimestampData.diffs.push(curr - accTimestampData.last);
-                            accTimestampData.last = curr;
-                            return accTimestampData;
-                        },{last: 0, diffs: [] as number[]});
-                        const avgDiff = diffData.diffs.reduce((acc, curr) => acc + curr, 0) / diffData.diffs.length;
-
-                        acc[curr].averageTimeBetweenHits = formatNumber(avgDiff/1000);
-                    }
-
-                    const {requestTimestamps, identifierRequestCount, ...rest} = acc[curr];
-                    // @ts-ignore
-                    acc[curr] = rest;
-
-                    return acc;
-                }, Promise.resolve({...this.stats.cache}))
-            }
-        }
-        return res;
+        return this.subredditStats.getCacheStatsForManager();
     }
 
     setLogger(logger: Logger) {
@@ -911,27 +670,23 @@ export class SubredditResources {
             let hash = '';
             if (this.ttl.submissionTTL !== false && asSubmission(item)) {
                 hash = `sub-${item.name}`;
-                await this.stats.cache.submission.identifierRequestCount.set(hash, (await this.stats.cache.submission.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-                this.stats.cache.submission.requestTimestamps.push(Date.now());
-                this.stats.cache.submission.requests++;
                 const cachedSubmission = await this.cache.get(hash);
                 if (cachedSubmission !== undefined && cachedSubmission !== null) {
+                    await this.subredditStats.incrementCacheTypeStat('submission', hash, false);
                     this.logger.debug(`Cache Hit: Submission ${item.name}`);
                     return cachedSubmission;
                 }
-                this.stats.cache.submission.miss++;
+                await this.subredditStats.incrementCacheTypeStat('submission', hash, true);
                 return await this.setActivity(item);
             } else if (this.ttl.commentTTL !== false) {
                 hash = `comm-${item.name}`;
-                await this.stats.cache.comment.identifierRequestCount.set(hash, (await this.stats.cache.comment.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-                this.stats.cache.comment.requestTimestamps.push(Date.now());
-                this.stats.cache.comment.requests++;
                 const cachedComment = await this.cache.get(hash);
                 if (cachedComment !== undefined && cachedComment !== null) {
                     this.logger.debug(`Cache Hit: Comment ${item.name}`);
+                    await this.subredditStats.incrementCacheTypeStat('comment', hash, false);
                     return cachedComment;
                 }
-                this.stats.cache.comment.miss++;
+                await this.subredditStats.incrementCacheTypeStat('comment', hash, true);
                 return this.setActivity(item);
             } else {
                 // @ts-ignore
@@ -1041,17 +796,15 @@ export class SubredditResources {
             if (this.ttl.subredditTTL !== false) {
 
                 hash = `sub-${subName}`;
-                await this.stats.cache.subreddit.identifierRequestCount.set(hash, (await this.stats.cache.subreddit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-                this.stats.cache.subreddit.requestTimestamps.push(Date.now());
-                this.stats.cache.subreddit.requests++;
                 const cachedSubreddit = await this.cache.get(hash);
                 if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
                     logger.debug(`Cache Hit: Subreddit ${subName}`);
+                    await this.subredditStats.incrementCacheTypeStat('subreddit', hash, false);
                     return new Subreddit(cachedSubreddit, this.client, false);
                 }
+                await this.subredditStats.incrementCacheTypeStat('subreddit', hash, true);
                 // @ts-ignore
                 const subreddit = await (item instanceof Subreddit ? item : this.client.getSubreddit(subName)).fetch() as Subreddit;
-                this.stats.cache.subreddit.miss++;
                 // @ts-ignore
                 await this.cache.set(hash, subreddit, {ttl: this.ttl.subredditTTL});
                 // @ts-ignore
@@ -1165,13 +918,8 @@ export class SubredditResources {
     async hasSubreddit(name: string) {
         if (this.ttl.subredditTTL !== false) {
             const hash = `sub-${name}`;
-            this.stats.cache.subreddit.requests++
-            this.stats.cache.subreddit.requestTimestamps.push(Date.now());
-            await this.stats.cache.subreddit.identifierRequestCount.set(hash, (await this.stats.cache.subreddit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
             const val = await this.cache.get(hash);
-            if(val === undefined || val === null) {
-                this.stats.cache.subreddit.miss++;
-            }
+            await this.subredditStats.incrementCacheTypeStat('subreddit', hash, val === undefined || val === null);
             return val !== undefined && val !== null;
         }
         return false;
@@ -1380,15 +1128,12 @@ export class SubredditResources {
                     hashObj.subreddit = this.subreddit;
                 }
 
-                this.stats.cache.author.requests++;
-                await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
-                this.stats.cache.author.requestTimestamps.push(Date.now());
-
                 const cacheVal = await this.cache.get(cacheKey);
 
                 if(cacheVal === undefined || cacheVal === null) {
-                    this.stats.cache.author.miss++;
+                    await this.subredditStats.incrementCacheTypeStat('author', userName, true);
                 } else {
+                    await this.subredditStats.incrementCacheTypeStat('author', userName, false);
                     fromCache = true;
                     const {
                         pre: cachedPre,
@@ -1681,15 +1426,13 @@ export class SubredditResources {
 
         // try to get cached value first
         if (this.ttl.wikiTTL !== false) {
-            await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
-            this.stats.cache.content.requestTimestamps.push(Date.now());
-            this.stats.cache.content.requests++;
             const cachedContent = await this.cache.get(cacheKey);
             if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Content Cache Hit: ${cacheKey}`);
+                await this.subredditStats.incrementCacheTypeStat('content', cacheKey, false);
                 return {val: cachedContent as string, fromCache: true, hash: cacheKey};
             } else {
-                this.stats.cache.content.miss++;
+                await this.subredditStats.incrementCacheTypeStat('content', cacheKey, true);
             }
         }
 
@@ -1710,15 +1453,13 @@ export class SubredditResources {
         const cacheKey = `${subreddit}-content-${wiki}${data.subreddit !== undefined ? `|${data.subreddit}` : ''}`;
 
         if (this.ttl.wikiTTL !== false) {
-            await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
-            this.stats.cache.content.requestTimestamps.push(Date.now());
-            this.stats.cache.content.requests++;
             const cachedContent = await this.cache.get(cacheKey);
             if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Content Cache Hit: ${cacheKey}`);
+                await this.subredditStats.incrementCacheTypeStat('content', cacheKey, false);
                 return {val: cachedContent as string, fromCache: true, hash: cacheKey};
             } else {
-                this.stats.cache.content.miss++;
+                await this.subredditStats.incrementCacheTypeStat('content', cacheKey, true);
             }
         }
 
@@ -1987,16 +1728,14 @@ export class SubredditResources {
         if (this.ttl.filterCriteriaTTL !== false && shouldCacheSubredditStateCriteriaResult(state)) {
             try {
                 const hash = `subredditCrit-${getActivitySubredditName(item)}-${objectHash.sha1(state)}`;
-                await this.stats.cache.subredditCrit.identifierRequestCount.set(hash, (await this.stats.cache.subredditCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-                this.stats.cache.subredditCrit.requestTimestamps.push(Date.now());
-                this.stats.cache.subredditCrit.requests++;
                 const cachedItem = await this.cache.get(hash);
                 if (cachedItem !== undefined && cachedItem !== null) {
                     this.logger.debug(`Cache Hit: Subreddit Check on ${getActivitySubredditName(item)} (Hash ${hash})`);
+                    await this.subredditStats.incrementCacheTypeStat('subredditCrit', hash, false);
                     return cachedItem as boolean;
                 }
                 const itemResult = await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger);
-                this.stats.cache.subredditCrit.miss++;
+                await this.subredditStats.incrementCacheTypeStat('subredditCrit', hash, true);
                 await this.cache.set(hash, itemResult, {ttl: this.ttl.filterCriteriaTTL});
                 return itemResult;
             } catch (err: any) {
@@ -2022,17 +1761,15 @@ export class SubredditResources {
             const hashObj = {...authorOpts, include};
             const userName = getActivityAuthorName(item.author);
             const hash = `authorCrit-${this.subreddit.display_name}-${userName}-${objectHash.sha1(hashObj)}`;
-            await this.stats.cache.authorCrit.identifierRequestCount.set(hash, (await this.stats.cache.authorCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-            this.stats.cache.authorCrit.requestTimestamps.push(Date.now());
-            this.stats.cache.authorCrit.requests++;
 
             // need to check shape of result to invalidate old result type
             let cachedAuthorTest: FilterCriteriaResult<AuthorCriteria> = await this.cache.get(hash) as FilterCriteriaResult<AuthorCriteria>;
             if(cachedAuthorTest !== null && cachedAuthorTest !== undefined && typeof cachedAuthorTest === 'object') {
                 this.logger.debug(`Cache Hit: Author Check on ${userName} (Hash ${hash})`);
+                await this.subredditStats.incrementCacheTypeStat('authorCrit', hash, false);
                 return cachedAuthorTest;
             } else {
-                this.stats.cache.authorCrit.miss++;
+                await this.subredditStats.incrementCacheTypeStat('authorCrit', hash, true);
                 cachedAuthorTest = await this.isAuthor(item, authorOpts, include);
                 cachedAuthorTest.criteria = cloneDeep(authorOptsObj);
                 await this.cache.set(hash, cachedAuthorTest, {ttl: this.ttl.filterCriteriaTTL});
@@ -2088,17 +1825,15 @@ export class SubredditResources {
             try {
                 // only cache non-runtime state and results
                 const hash = `itemCrit-${item.name}-${objectHash.sha1({...state, include})}`;
-                await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-                this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
-                this.stats.cache.itemCrit.requests++;
                 let itemResult = await this.cache.get(hash) as FilterCriteriaResult<TypedActivityState> | undefined | null;
                 if (itemResult !== undefined && itemResult !== null) {
+                    await this.subredditStats.incrementCacheTypeStat('itemCrit', hash, false);
                     logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     //return cachedItem as boolean;
                 } else {
+                    await this.subredditStats.incrementCacheTypeStat('itemCrit', hash, true);
                     itemResult = await this.isItem(item, state, logger, include);
                 }
-                this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.ttl.filterCriteriaTTL});
 
                 // add in runtime results, if present
@@ -3315,17 +3050,15 @@ export class SubredditResources {
     async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<CheckResultEntity | Pick<CheckResultEntity, 'triggered' | 'results'> | undefined> {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`;
-        this.stats.cache.commentCheck.requests++;
-        this.stats.cache.commentCheck.requestTimestamps.push(Date.now());
-        await this.stats.cache.commentCheck.identifierRequestCount.set(hash, (await this.stats.cache.commentCheck.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
         let result = await this.cache.get(hash) as { id: string, results: (RuleResultEntity | RuleSetResultEntity)[], triggered: boolean } | undefined | null;
         if (result === null) {
             result = undefined;
         }
         if (result === undefined) {
-            this.stats.cache.commentCheck.miss++;
+            await this.subredditStats.incrementCacheTypeStat('commentCheck', hash, true);
             return result;
         }
+        await this.subredditStats.incrementCacheTypeStat('commentCheck', hash, false);
         const {id, results, triggered} = result;
         this.logger.debug(`Cache Hit: Comment Check for ${userName} in Submission ${item.link_id} (Hash ${hash})`);
         // check if the Check was persisted since that would be easiest
@@ -3384,20 +3117,18 @@ export class SubredditResources {
 
         const hash = `imgHash-${img.basePath}`;
         const result = await this.cache.get(hash) as string | undefined | null;
-        this.stats.cache.imageHash.requests++
-        this.stats.cache.imageHash.requestTimestamps.push(Date.now());
-        await this.stats.cache.imageHash.identifierRequestCount.set(hash, (await this.stats.cache.imageHash.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
         if(result !== undefined && result !== null) {
             try {
                 const data =  JSON.parse(result);
                 if(asStrongImageHashCache(data)) {
+                    await this.subredditStats.incrementCacheTypeStat('imageHash', hash, false);
                     return data;
                 }
             } catch (e) {
                 // had old values, just drop it
             }
         }
-        this.stats.cache.commentCheck.miss++;
+        await this.subredditStats.incrementCacheTypeStat('imageHash', hash, true);
         return undefined;
         // const hash = await this.cache.wrap(img.baseUrl, async () => await img.hash(true), { ttl }) as string;
         // if(img.hashResult === undefined) {

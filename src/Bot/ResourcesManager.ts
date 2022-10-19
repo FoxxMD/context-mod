@@ -208,7 +208,7 @@ export class BotResourcesManager {
                 resource.footer = opts.footer || DEFAULT_FOOTER;
             }
             // reset cache stats when configuration is reloaded
-            resource.stats.cache = cacheStats();
+            resource.subredditStats.stats.cache = cacheStats();
         }
         await resource.initDatabaseDelayedActivities();
 
