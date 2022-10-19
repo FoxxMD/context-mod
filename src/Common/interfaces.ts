@@ -481,6 +481,8 @@ export interface TTLConfig {
     modNotesTTL?: number | boolean;
 }
 
+export type StrongTTLConfig = Record<keyof TTLConfig, number | false>;
+
 export interface CacheConfig extends TTLConfig {
     /**
      * The cache provider and, optionally, a custom configuration for that provider

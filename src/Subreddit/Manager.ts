@@ -973,7 +973,7 @@ export class Manager extends EventEmitter implements RunningStates {
         const itemId = await item.id;
 
         if(await this.resources.hasRecentSelf(item)) {
-            let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
+            let recentMsg = `Found in Activities recently (last ${this.resources.ttl.selfTTL} seconds) modified/created by this bot`;
             if(force) {
                 this.logger.debug(`${recentMsg} but will run anyway because "force" option was true.`);
             } else {

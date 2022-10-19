@@ -229,7 +229,7 @@ export class MHSRule extends Rule {
     protected async getMHSResponse(content: string): Promise<MHSResponse> {
         const hash = objectHash.sha1({content});
         const key = `mhs-${hash}`;
-        if (this.resources.wikiTTL !== false) {
+        if (this.resources.ttl.wikiTTL !== false) {
             let res = await this.resources.cache.get(key) as undefined | null | MHSResponse;
             if(res !== undefined && res !== null) {
                 // don't cache bad responses
@@ -240,7 +240,7 @@ export class MHSRule extends Rule {
             }
             res = await this.callMHS(content);
             if(res.response.toLowerCase() === 'success') {
-                await this.resources.cache.set(key, res, {ttl: this.resources.wikiTTL});
+                await this.resources.cache.set(key, res, {ttl: this.resources.ttl.wikiTTL});
             }
             return res;
         }
