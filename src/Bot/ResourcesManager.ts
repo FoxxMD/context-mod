@@ -96,7 +96,7 @@ export class BotResourcesManager {
         this.cacheType = options.store;
 
         const cache = createCacheManager(options);
-        this.defaultCache = new CMCache(cache, options, true, this.ttlDefaults, this.logger);
+        this.defaultCache = new CMCache(cache, options, true, caching.provider.prefix, this.ttlDefaults, this.logger);
     }
 
     get(subName: string): SubredditResources | undefined {
@@ -147,7 +147,7 @@ export class BotResourcesManager {
             } else if(res !== undefined && res.cache.equalProvider(candidateProvider)) {
                 opts.cache = res.cache;
             } else {
-                opts.cache = new CMCache(createCacheManager(candidateProvider), candidateProvider, false, opts.ttl, this.logger);
+                opts.cache = new CMCache(createCacheManager(candidateProvider), candidateProvider, false, this.defaultCache.providerOptions.prefix, opts.ttl, this.logger);
                 await runMigrations(opts.cache.cache, opts.cache.logger, candidateProvider.prefix);
             }
 

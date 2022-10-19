@@ -49,14 +49,16 @@ export class CMCache {
     prefix?: string
     cache: Cache
     isDefaultCache: boolean
+    defaultPrefix?: string
     providerOptions: CacheOptions;
     logger!: Logger;
 
-    constructor(cache: Cache, providerOptions: CacheOptions, defaultCache: boolean, ttls: Partial<StrongTTLConfig>, logger: Logger) {
+    constructor(cache: Cache, providerOptions: CacheOptions, defaultCache: boolean, defaultPrefix: string | undefined, ttls: Partial<StrongTTLConfig>, logger: Logger) {
         this.cache = cache;
         this.providerOptions = providerOptions
         this.isDefaultCache = defaultCache;
         this.prefix = this.providerOptions.prefix ?? '';
+        this.defaultPrefix = defaultPrefix ?? '';
 
         this.setLogger(logger);
 
@@ -175,24 +177,27 @@ export class CMCache {
         return this.cache.store;
     }
 
-    del(key: string): Promise<any> {
-        return this.cache.del(`${this.prefix}${key}`);
+    del(key: string, shared = false): Promise<any> {
+        return this.cache.del(`${shared ? this.defaultPrefix : this.prefix}${key}`);
     }
 
-    get<T>(key: string): Promise<T | undefined> {
-        return this.cache.get(`${this.prefix}${key}`);
+    get<T>(key: string, shared = false): Promise<T | undefined> {
+        return this.cache.get(`${shared ? this.defaultPrefix : this.prefix}${key}`);
     }
 
     reset(): Promise<void> {
         return this.cache.reset();
     }
 
-    set<T>(key: string, value: T, options?: CachingConfig): Promise<T> {
-        return this.cache.set(`${this.prefix}${key}`, value, options);
+    set<T>(key: string, value: T, options?: CachingConfig & {shared?: boolean}): Promise<T> {
+        const {shared = false} = options || {};
+        return this.cache.set(`${shared ? this.defaultPrefix : this.prefix}${key}`, value, options);
     }
 
     wrap<T>(...args: WrapArgsType<T>[]): Promise<T> {
-        args[0] = `${this.prefix}${args[0]}`;
+        const options: any = args.length >= 3 ? args[2] : {};
+        const {shared = false} = options || {};
+        args[0] = `${shared ? this.defaultPrefix : this.prefix}${args[0]}`;
         return this.cache.wrap(...args);
     }
 
