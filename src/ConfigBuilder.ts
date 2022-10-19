@@ -364,12 +364,14 @@ export class ConfigBuilder {
         return validatedHydratedConfig;
     }
 
-    async parseToStructured(config: SubredditConfigData, resource: SubredditResources, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): Promise<RunConfigObject[]> {
+    async parseToHydrated(config: SubredditConfigData, resource: SubredditResources) {
+        return await this.hydrateConfig(config, resource);
+    }
+
+    async parseToStructured(hydratedConfig: SubredditConfigHydratedData, resource: SubredditResources, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): Promise<RunConfigObject[]> {
         let namedRules: Map<string, RuleConfigObject> = new Map();
         let namedActions: Map<string, ActionConfigObject> = new Map();
-        const {filterCriteriaDefaults, postCheckBehaviorDefaults} = config;
-
-        const hydratedConfig = await this.hydrateConfig(config, resource);
+        const {filterCriteriaDefaults, postCheckBehaviorDefaults} = hydratedConfig;
 
         const {runs: realRuns = []} = hydratedConfig;
 
