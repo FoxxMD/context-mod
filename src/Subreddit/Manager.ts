@@ -804,6 +804,9 @@ export class Manager extends EventEmitter implements RunningStates {
 
     async parseConfiguration(causedBy: Invokee = 'system', force: boolean = false, options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false, suppressChangeEvent = false} = options || {};
+        if(this.resources === undefined) {
+            await this.setResourceManager();
+        }
         //this.wikiUpdateRunning = true;
         this.lastWikiCheck = dayjs();
 
@@ -812,8 +815,9 @@ export class Manager extends EventEmitter implements RunningStates {
             let wiki: WikiPage;
             try {
                 try {
-                    // @ts-ignore
-                    wiki = await this.getWikiPage();
+                    const {val, wikiPage} = await this.resources.getWikiPage({wiki: this.wikiLocation}, {force: true});
+                    wiki = wikiPage as WikiPage;
+                    //sourceData = val as string;
                 } catch (err: any) {
                     if(err.cause !== undefined && isStatusError(err.cause) && err.cause.statusCode === 404) {
                         // try to create it
@@ -1875,33 +1879,6 @@ export class Manager extends EventEmitter implements RunningStates {
                 throw err;
             }
         }
-    }
-
-    // @ts-ignore
-    async getWikiPage(location: string = this.wikiLocation) {
-        let wiki: WikiPage;
-        try {
-            // @ts-ignore
-            wiki = await this.subreddit.getWikiPage(location).fetch();
-        } catch (err: any) {
-            if (isStatusError(err)) {
-                const error = err.statusCode === 404 ? 'does not exist' : 'is not accessible';
-                let reasons = [];
-                if (!this.client.scope.includes('wikiread')) {
-                    reasons.push(`Bot does not have 'wikiread' oauth permission`);
-                } else {
-                    const modPermissions = await this.getModPermissions();
-                    if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
-                        reasons.push(`Bot does not have required mod permissions ('all'  or 'wiki') to read restricted wiki pages`);
-                    }
-                }
-
-                throw new CMError(`Wiki page ${generateFullWikiUrl(this.subreddit, location)} ${error} (${err.statusCode})${reasons.length > 0 ? ` because: ${reasons.join(' | ')}` : '.'}`, {cause: err});
-            } else {
-                throw new CMError(`Wiki page ${generateFullWikiUrl(this.subreddit, location)} could not be read`, {cause: err});
-            }
-        }
-        return wiki;
     }
 
     toNormalizedManager(): NormalizedManagerResponse {

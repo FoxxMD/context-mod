@@ -63,7 +63,7 @@ import {
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import {Cache} from 'cache-manager';
-import {Comment, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
+import {Comment, RedditUser, Submission, Subreddit, WikiPage} from "snoowrap/dist/objects";
 import {cacheTTLDefaults, createHistoricalDisplayDefaults,} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs, {Dayjs} from "dayjs";
@@ -161,6 +161,14 @@ import {SubredditStats} from "./Stats";
 import {CMCache} from "../Common/Cache";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
+
+export interface ExternalResourceOptions {
+    subreddit?: Subreddit
+    defaultTo?: 'url' | 'wiki',
+    force?: boolean
+    shared?: boolean,
+    ttl?: number
+}
 
 export class SubredditResources {
     
@@ -1330,7 +1338,8 @@ export class SubredditResources {
         return filteredListing;
     }
 
-    async getExternalResource(val: string, subredditArg?: Subreddit, defaultTo: 'url' | 'wiki' | undefined = undefined): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+    async getExternalResource(val: string, options: ExternalResourceOptions = {}): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+        const {defaultTo} = options;
         let wikiContext = parseWikiContext(val);
 
         let extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
@@ -1344,21 +1353,22 @@ export class SubredditResources {
         }
 
         if (wikiContext !== undefined) {
-            return await this.getWikiPage(wikiContext, subredditArg !== undefined ? subredditArg.display_name : undefined);
+            return await this.getWikiPage(wikiContext, options);
         }
         if (extUrl !== undefined) {
-            return await this.getCachedUrlResult(extUrl);
+            return await this.getCachedUrlResult(extUrl, options);
         }
 
         return {val, fromCache: false};
     }
 
-    async getCachedUrlResult(extUrl: string): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+    async getCachedUrlResult(extUrl: string, options: ExternalResourceOptions = {}): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
         const cacheKey = extUrl;
+        const {force = false, shared = false} = options;
 
         // try to get cached value first
-        if (this.ttl.wikiTTL !== false) {
-            const cachedContent = await this.cache.get(cacheKey);
+        if (!force && this.ttl.wikiTTL !== false) {
+            const cachedContent = await this.cache.get(cacheKey, shared);
             if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Content Cache Hit: ${cacheKey}`);
                 await this.subredditStats.incrementCacheTypeStat('content', cacheKey, false);
@@ -1376,16 +1386,17 @@ export class SubredditResources {
         }
     }
 
-    async getWikiPage(data: WikiContext, subredditArg?: string): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+    async getWikiPage(data: WikiContext, options: ExternalResourceOptions = {}): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string, wikiPage?: WikiPage}> {
+        const {subreddit: subredditArg, force = false, shared = false } = options;
         const {
-            subreddit = subredditArg ?? this.subreddit.display_name,
+            subreddit = subredditArg !== undefined ? subredditArg.display_name : this.subreddit.display_name,
             wiki
         } = data;
 
         const cacheKey = `${subreddit}-content-${wiki}${data.subreddit !== undefined ? `|${data.subreddit}` : ''}`;
 
-        if (this.ttl.wikiTTL !== false) {
-            const cachedContent = await this.cache.get(cacheKey);
+        if (!force && this.ttl.wikiTTL !== false) {
+            const cachedContent = await this.cache.get(cacheKey, shared);
             if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Content Cache Hit: ${cacheKey}`);
                 await this.subredditStats.incrementCacheTypeStat('content', cacheKey, false);
@@ -1399,9 +1410,9 @@ export class SubredditResources {
 
         try {
             // @ts-ignore
-            const wikiPage = sub.getWikiPage(wiki);
-            const wikiContent = await wikiPage.content_md;
-            return {val: wikiContent, fromCache: false, hash: cacheKey};
+            const wikiPage = await sub.getWikiPage(wiki).fetch();
+            const wikiContent = wikiPage.content_md;
+            return {val: wikiContent, fromCache: false, hash: cacheKey, wikiPage};
         } catch (err: any) {
             if (isStatusError(err)) {
                 const error = err.statusCode === 404 ? 'does not exist' : 'is not accessible';
@@ -1422,11 +1433,12 @@ export class SubredditResources {
         }
     }
 
-    async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
-        const {val: wikiContent, fromCache, hash} = await this.getExternalResource(val, subredditArg);
+    async getContent(val: string, options: ExternalResourceOptions = {}): Promise<string> {
+        const {val: wikiContent, fromCache, hash} = await this.getExternalResource(val, options);
+        const {ttl = this.ttl.wikiTTL, shared = false} = options;
 
-        if (!fromCache && hash !== undefined && this.ttl.wikiTTL !== false) {
-            this.cache.set(hash, wikiContent, {ttl: this.ttl.wikiTTL});
+        if (!fromCache && hash !== undefined && ttl !== false) {
+            await this.cache.set(hash, wikiContent, {ttl, shared});
         }
 
         return wikiContent;
