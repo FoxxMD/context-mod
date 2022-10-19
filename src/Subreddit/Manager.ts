@@ -272,8 +272,8 @@ export class Manager extends EventEmitter implements RunningStates {
             data.historical = this.resources.getHistoricalDisplayStats();
             data.cache = resStats.cache;
             data.cache.currentKeyCount = await this.resources.getCacheKeyCount();
-            data.cache.isShared = this.resources.cacheSettingsHash === 'default';
-            data.cache.provider = this.resources.cacheType;
+            data.cache.isShared = this.resources.cache.isDefaultCache;
+            data.cache.provider = this.resources.cache.providerOptions.store;
         }
         return data;
     }

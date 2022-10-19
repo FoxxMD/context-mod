@@ -10,6 +10,7 @@ import {ErrorWithCause} from "pony-cause";
 import {cacheStats, formatNumber, frequencyEqualOrLargerThanMin, mergeArr} from "../../util";
 import {Cache} from "cache-manager";
 import winston, {Logger} from "winston";
+import {CMCache} from "../../Common/Cache";
 
 export class SubredditStats {
     totalStatsRepo: Repository<TotalStat>
@@ -19,8 +20,9 @@ export class SubredditStats {
     statFrequency: StatisticFrequencyOption
     historicalSaveInterval?: any;
     managerEntity: ManagerEntity;
-    cache: Cache;
+    cache: CMCache;
     protected logger: Logger;
+    init: boolean = false;
 
     stats: {
         cache: ResourceStats
@@ -28,7 +30,7 @@ export class SubredditStats {
         timeSeries: HistoricalStatsDisplay
     };
 
-    constructor(database: DataSource, managerEntity: ManagerEntity, cache: Cache, statFrequency: StatisticFrequencyOption, logger: Logger) {
+    constructor(database: DataSource, managerEntity: ManagerEntity, cache: CMCache, statFrequency: StatisticFrequencyOption, logger: Logger) {
         this.totalStatsRepo = database.getRepository(TotalStat);
         this.tsStatsRepo = database.getRepository(TimeSeriesStat);
         this.statFrequency = statFrequency;
@@ -48,91 +50,94 @@ export class SubredditStats {
         };
     }
 
-    async initStats() {
-        try {
-            let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
-            const totalStats = await this.totalStatsRepo.findBy({managerId: this.managerEntity.id});
-            if (totalStats.length === 0) {
-                const now = dayjs();
-                const statEntities: TotalStat[] = [];
-                for (const [k, v] of Object.entries(currentStats)) {
-                    statEntities.push(new TotalStat({
-                        metric: k,
-                        value: v,
-                        manager: this.managerEntity,
-                        createdAt: now,
-                    }));
-                }
-                await this.totalStatsRepo.save(statEntities);
-                this.totalStatsEntities = statEntities;
-            } else {
-                this.totalStatsEntities = totalStats;
-                for (const [k, v] of Object.entries(currentStats)) {
-                    const matchedStat = totalStats.find(x => x.metric === k);
-                    if (matchedStat !== undefined) {
-                        currentStats[k] = matchedStat.value;
-                    } else {
-                        this.logger.warn(`Could not find historical stat matching '${k}' in the database, will default to 0`);
-                        currentStats[k] = v;
-                    }
-                }
-            }
-            this.stats.historical = currentStats;
-        } catch (e) {
-            this.logger.error(new ErrorWithCause('Failed to init historical stats', {cause: e}));
-        }
-
-        try {
-            if (this.statFrequency !== false) {
+    async initStats(force: boolean = false) {
+        if (!this.init || force) {
+            try {
                 let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
-                let startRange = dayjs().set('second', 0);
-                for (const unit of statFrequencies) {
-                    if (unit !== 'week' && !frequencyEqualOrLargerThanMin(unit, this.statFrequency)) {
-                        startRange = startRange.set(unit, 0);
-                    }
-                    if (unit === 'week' && this.statFrequency === 'week') {
-                        // make sure we get beginning of week
-                        startRange = startRange.week(startRange.week());
-                    }
-                }
-                // set end range by +1 of whatever unit we are using
-                const endRange = this.statFrequency === 'week' ? startRange.clone().week(startRange.week() + 1) : startRange.clone().set(this.statFrequency, startRange.get(this.statFrequency) + 1);
-
-                const tsStats = await this.tsStatsRepo.findBy({
-                    managerId: this.managerEntity.id,
-                    granularity: this.statFrequency,
-                    // make sure its inclusive!
-                    _createdAt: Between(startRange.clone().subtract(1, 'second').toDate(), endRange.clone().add(1, 'second').toDate())
-                });
-
-                if (tsStats.length === 0) {
-                    const statEntities: TimeSeriesStat[] = [];
+                const totalStats = await this.totalStatsRepo.findBy({managerId: this.managerEntity.id});
+                if (totalStats.length === 0) {
+                    const now = dayjs();
+                    const statEntities: TotalStat[] = [];
                     for (const [k, v] of Object.entries(currentStats)) {
-                        statEntities.push(new TimeSeriesStat({
+                        statEntities.push(new TotalStat({
                             metric: k,
                             value: v,
-                            granularity: this.statFrequency,
                             manager: this.managerEntity,
-                            createdAt: startRange,
+                            createdAt: now,
                         }));
                     }
-                    this.timeSeriesStatsEntities = statEntities;
+                    await this.totalStatsRepo.save(statEntities);
+                    this.totalStatsEntities = statEntities;
                 } else {
-                    this.timeSeriesStatsEntities = tsStats;
-                }
-
-                for (const [k, v] of Object.entries(currentStats)) {
-                    const matchedStat = this.timeSeriesStatsEntities.find(x => x.metric === k);
-                    if (matchedStat !== undefined) {
-                        currentStats[k] = matchedStat.value;
-                    } else {
-                        this.logger.warn(`Could not find time series stat matching '${k}' in the database, will default to 0`);
-                        currentStats[k] = v;
+                    this.totalStatsEntities = totalStats;
+                    for (const [k, v] of Object.entries(currentStats)) {
+                        const matchedStat = totalStats.find(x => x.metric === k);
+                        if (matchedStat !== undefined) {
+                            currentStats[k] = matchedStat.value;
+                        } else {
+                            this.logger.warn(`Could not find historical stat matching '${k}' in the database, will default to 0`);
+                            currentStats[k] = v;
+                        }
                     }
                 }
+                this.stats.historical = currentStats;
+            } catch (e) {
+                this.logger.error(new ErrorWithCause('Failed to init historical stats', {cause: e}));
             }
-        } catch (e) {
-            this.logger.error(new ErrorWithCause('Failed to init frequency (time series) stats', {cause: e}));
+
+            try {
+                if (this.statFrequency !== false) {
+                    let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
+                    let startRange = dayjs().set('second', 0);
+                    for (const unit of statFrequencies) {
+                        if (unit !== 'week' && !frequencyEqualOrLargerThanMin(unit, this.statFrequency)) {
+                            startRange = startRange.set(unit, 0);
+                        }
+                        if (unit === 'week' && this.statFrequency === 'week') {
+                            // make sure we get beginning of week
+                            startRange = startRange.week(startRange.week());
+                        }
+                    }
+                    // set end range by +1 of whatever unit we are using
+                    const endRange = this.statFrequency === 'week' ? startRange.clone().week(startRange.week() + 1) : startRange.clone().set(this.statFrequency, startRange.get(this.statFrequency) + 1);
+
+                    const tsStats = await this.tsStatsRepo.findBy({
+                        managerId: this.managerEntity.id,
+                        granularity: this.statFrequency,
+                        // make sure its inclusive!
+                        _createdAt: Between(startRange.clone().subtract(1, 'second').toDate(), endRange.clone().add(1, 'second').toDate())
+                    });
+
+                    if (tsStats.length === 0) {
+                        const statEntities: TimeSeriesStat[] = [];
+                        for (const [k, v] of Object.entries(currentStats)) {
+                            statEntities.push(new TimeSeriesStat({
+                                metric: k,
+                                value: v,
+                                granularity: this.statFrequency,
+                                manager: this.managerEntity,
+                                createdAt: startRange,
+                            }));
+                        }
+                        this.timeSeriesStatsEntities = statEntities;
+                    } else {
+                        this.timeSeriesStatsEntities = tsStats;
+                    }
+
+                    for (const [k, v] of Object.entries(currentStats)) {
+                        const matchedStat = this.timeSeriesStatsEntities.find(x => x.metric === k);
+                        if (matchedStat !== undefined) {
+                            currentStats[k] = matchedStat.value;
+                        } else {
+                            this.logger.warn(`Could not find time series stat matching '${k}' in the database, will default to 0`);
+                            currentStats[k] = v;
+                        }
+                    }
+                }
+            } catch (e) {
+                this.logger.error(new ErrorWithCause('Failed to init frequency (time series) stats', {cause: e}));
+            }
+            this.init = true;
         }
     }
 
@@ -206,7 +211,7 @@ export class SubredditStats {
                 // TODO could probably combine these two
                 totalRequests: totals.req,
                 totalMiss: totals.miss,
-                missPercent: `${formatNumber(totals.miss === 0 || totals.req === 0 ? 0 :(totals.miss/totals.req) * 100, {toFixed: 0})}%`,
+                missPercent: `${formatNumber(totals.miss === 0 || totals.req === 0 ? 0 : (totals.miss / totals.req) * 100, {toFixed: 0})}%`,
                 types: await cacheKeys.reduce(async (accProm, curr) => {
                     const acc = await accProm;
                     // calculate miss percent
@@ -219,28 +224,28 @@ export class SubredditStats {
                     const idCache = acc[curr].identifierRequestCount;
                     // @ts-expect-error
                     const idKeys = await idCache.store.keys() as string[];
-                    if(idKeys.length > 0) {
+                    if (idKeys.length > 0) {
                         let hits = 0;
                         for (const k of idKeys) {
                             hits += await idCache.get(k) as number;
                         }
-                        acc[curr].identifierAverageHit = formatNumber(hits/idKeys.length);
+                        acc[curr].identifierAverageHit = formatNumber(hits / idKeys.length);
                     }
 
-                    if(acc[curr].requestTimestamps.length > 1) {
+                    if (acc[curr].requestTimestamps.length > 1) {
                         // calculate average time between request
                         const diffData = acc[curr].requestTimestamps.reduce((accTimestampData, curr: number) => {
-                            if(accTimestampData.last === 0) {
+                            if (accTimestampData.last === 0) {
                                 accTimestampData.last = curr;
                                 return accTimestampData;
                             }
                             accTimestampData.diffs.push(curr - accTimestampData.last);
                             accTimestampData.last = curr;
                             return accTimestampData;
-                        },{last: 0, diffs: [] as number[]});
+                        }, {last: 0, diffs: [] as number[]});
                         const avgDiff = diffData.diffs.reduce((acc, curr) => acc + curr, 0) / diffData.diffs.length;
 
-                        acc[curr].averageTimeBetweenHits = formatNumber(avgDiff/1000);
+                        acc[curr].averageTimeBetweenHits = formatNumber(avgDiff / 1000);
                     }
 
                     const {requestTimestamps, identifierRequestCount, ...rest} = acc[curr];
@@ -258,7 +263,7 @@ export class SubredditStats {
         if (this.stats.cache[cacheType] === undefined) {
             this.logger.warn(`Cache type ${cacheType} does not exist. Fix this!`);
         }
-        if(hash !== undefined) {
+        if (hash !== undefined) {
             await this.stats.cache[cacheType].identifierRequestCount.set(hash, (await this.stats.cache[cacheType].identifierRequestCount.wrap(hash, () => 0) as number) + 1);
         }
         this.stats.cache[cacheType].requestTimestamps.push(Date.now());
@@ -269,9 +274,14 @@ export class SubredditStats {
         }
     }
 
+    resetCacheStats() {
+        this.stats.cache = cacheStats();
+    }
+
     async destroy() {
         if (this.historicalSaveInterval !== undefined) {
             clearInterval(this.historicalSaveInterval);
+            await this.saveHistoricalStats();
         }
     }
 }

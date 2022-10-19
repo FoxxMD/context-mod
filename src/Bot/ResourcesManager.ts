@@ -1,7 +1,13 @@
 import {SPoll} from "../Subreddit/Streams";
 import Snoowrap from "snoowrap";
 import {Cache} from "cache-manager";
-import {BotInstanceConfig, StrongCache, ThirdPartyCredentialsJsonConfig, TTLConfig} from "../Common/interfaces";
+import {
+    BotInstanceConfig,
+    StrongCache,
+    StrongTTLConfig,
+    ThirdPartyCredentialsJsonConfig,
+    TTLConfig
+} from "../Common/interfaces";
 import winston, {Logger} from "winston";
 import {DataSource, Repository} from "typeorm";
 import {
@@ -9,27 +15,25 @@ import {
 } from "../Common/Infrastructure/Atomic";
 import {InvokeeType} from "../Common/Entities/InvokeeType";
 import {RunStateType} from "../Common/Entities/RunStateType";
-import {buildCacheOptionsFromProvider, buildCachePrefix, cacheStats, createCacheManager} from "../util";
+import {buildCachePrefix, cacheStats, mergeArr, toStrongTTLConfig} from "../util";
 import objectHash from "object-hash";
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {CMError} from "../Utils/Errors";
 import {DEFAULT_FOOTER, SubredditResources} from "../Subreddit/SubredditResources";
 import {SubredditResourceConfig, SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
+import {buildCacheOptionsFromProvider, CMCache, createCacheManager} from "../Common/Cache";
 
 export class BotResourcesManager {
     resources: Map<string, SubredditResources> = new Map();
     authorTTL: number = 10000;
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
-    defaultCache: Cache;
+    defaultCache: CMCache;
     defaultCacheConfig: StrongCache
     defaultCacheMigrated: boolean = false;
     cacheType: string = 'none';
     cacheHash: string;
-    ttlDefaults: Required<TTLConfig>;
-    actionedEventsMaxDefault?: number;
-    actionedEventsDefault: number;
-    pruneInterval: any;
+    ttlDefaults: StrongTTLConfig
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     logger: Logger;
     botAccount?: string;
@@ -53,8 +57,6 @@ export class BotResourcesManager {
                 modNotesTTL,
                 selfTTL,
                 provider,
-                actionedEventsMax,
-                actionedEventsDefault,
             },
             name,
             credentials: {
@@ -68,12 +70,12 @@ export class BotResourcesManager {
             caching,
         } = config;
         caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
-        const {actionedEventsMax: eMax, actionedEventsDefault: eDef, ...relevantCacheSettings} = caching;
+        const {...relevantCacheSettings} = caching;
         this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
         this.defaultDatabase = database;
-        this.ttlDefaults = {
+        this.ttlDefaults = toStrongTTLConfig({
             authorTTL,
             userNotesTTL,
             wikiTTL,
@@ -83,7 +85,7 @@ export class BotResourcesManager {
             subredditTTL,
             selfTTL,
             modNotesTTL
-        };
+        });
         this.botName = name as string;
         this.logger = logger;
         this.invokeeRepo = this.defaultDatabase.getRepository(InvokeeType);
@@ -92,23 +94,9 @@ export class BotResourcesManager {
 
         const options = provider;
         this.cacheType = options.store;
-        this.actionedEventsMaxDefault = actionedEventsMax;
-        this.actionedEventsDefault = actionedEventsDefault;
-        this.defaultCache = createCacheManager(options);
-        if (this.cacheType === 'memory') {
-            const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
-            if (min > 0) {
-                // set default prune interval
-                this.pruneInterval = setInterval(() => {
-                    // @ts-ignore
-                    this.defaultCache?.store.prune();
-                    // kinda hacky but whatever
-                    const logger = winston.loggers.get('app');
-                    logger.debug('Pruned Shared Cache');
-                    // prune interval should be twice the smallest TTL
-                }, min * 1000 * 2)
-            }
-        }
+
+        const cache = createCacheManager(options);
+        this.defaultCache = new CMCache(cache, options, true, this.ttlDefaults, this.logger);
     }
 
     get(subName: string): SubredditResources | undefined {
@@ -122,17 +110,7 @@ export class BotResourcesManager {
         let hash = 'default';
         const {caching, credentials, retention, ...init} = initOptions;
 
-        // const bEntity = await this.defaultDatabase.getRepository(Bot).findOne({where: {name: this.botName}}) as Bot;
-        // //const subreddit = this.defaultDatabase.getRepository(SubredditEntity).findOne({name: initOptions.subreddit.display_name});
-        // const mEntity = await this.defaultDatabase.getRepository(Manager).findOne({
-        //     where: {
-        //         name: subName,
-        //         bot: {
-        //             id: bEntity.id
-        //         }
-        //     },
-        //     relations: ['bot']
-        // });
+        const res = this.get(subName);
 
         let opts: SubredditResourceOptions = {
             cache: this.defaultCache,
@@ -141,7 +119,6 @@ export class BotResourcesManager {
             ttl: this.ttlDefaults,
             thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
             prefix: this.defaultCacheConfig.provider.prefix,
-            actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
             database: this.defaultDatabase,
             botName: this.botName,
             retention: retention ?? this.retention,
@@ -151,66 +128,47 @@ export class BotResourcesManager {
         if (caching !== undefined) {
             const {
                 provider = this.defaultCacheConfig.provider,
-                actionedEventsMax = this.actionedEventsDefault,
                 ...rest
             } = caching;
-            let cacheConfig = {
-                provider: buildCacheOptionsFromProvider(provider),
-                ttl: {
-                    ...this.ttlDefaults,
-                    ...rest
-                },
+            
+            opts.ttl = toStrongTTLConfig({
+                ...this.ttlDefaults,
+                ...rest
+            });
+            
+            const candidateProvider = buildCacheOptionsFromProvider(provider);
+
+            const defaultPrefix = candidateProvider.prefix;
+            const subPrefix = defaultPrefix === this.defaultCacheConfig.provider.prefix ? buildCachePrefix([(defaultPrefix !== undefined ? defaultPrefix.replace('SHARED', '') : defaultPrefix), subName]) : candidateProvider.prefix;
+            candidateProvider.prefix = subPrefix;
+
+            if(this.defaultCache.equalProvider(candidateProvider)) {
+                opts.cache = this.defaultCache;
+            } else if(res !== undefined && res.cache.equalProvider(candidateProvider)) {
+                opts.cache = res.cache;
+            } else {
+                opts.cache = new CMCache(createCacheManager(candidateProvider), candidateProvider, false, opts.ttl, this.logger, candidateProvider.prefix);
+                await runMigrations(opts.cache.cache, opts.cache.logger, candidateProvider.prefix);
             }
-            hash = objectHash.sha1(cacheConfig);
-            // only need to create private if there settings are actually different than the default
-            if (hash !== this.cacheHash) {
-                const {provider: trueProvider, ...trueRest} = cacheConfig;
-                const defaultPrefix = trueProvider.prefix;
-                const subPrefix = defaultPrefix === this.defaultCacheConfig.provider.prefix ? buildCachePrefix([(defaultPrefix !== undefined ? defaultPrefix.replace('SHARED', '') : defaultPrefix), subName]) : trueProvider.prefix;
-                trueProvider.prefix = subPrefix;
-                const eventsMax = this.actionedEventsMaxDefault !== undefined ? Math.min(actionedEventsMax, this.actionedEventsMaxDefault) : actionedEventsMax;
-                opts = {
-                    cache: createCacheManager(trueProvider),
-                    actionedEventsMax: eventsMax,
-                    cacheType: trueProvider.store,
-                    cacheSettingsHash: hash,
-                    thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
-                    prefix: subPrefix,
-                    botName: this.botName,
-                    database: this.defaultDatabase,
-                    retention: retention ?? this.retention,
-                    ...init,
-                    ...trueRest,
-                };
-                await runMigrations(opts.cache, opts.logger, trueProvider.prefix);
-            }
+
         } else if (!this.defaultCacheMigrated) {
-            await runMigrations(this.defaultCache, this.logger, opts.prefix);
+            await runMigrations(this.defaultCache.cache, this.logger, opts.prefix);
             this.defaultCacheMigrated = true;
         }
 
         let resource: SubredditResources;
-        const res = this.get(subName);
-        if (res === undefined || res.cacheSettingsHash !== hash) {
+        if (res === undefined) {
             resource = new SubredditResources(subName, {
                 ...opts,
-                delayedItems: res?.delayedItems,
                 botAccount: this.botAccount
             });
-            await resource.initStats();
-            resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
         } else {
             // just set non-cache related settings
             resource = res;
             resource.botAccount = this.botAccount;
-            if (opts.footer !== resource.footer) {
-                resource.footer = opts.footer || DEFAULT_FOOTER;
-            }
-            // reset cache stats when configuration is reloaded
-            resource.subredditStats.stats.cache = cacheStats();
         }
-        await resource.initDatabaseDelayedActivities();
+        await resource.configure(opts);
 
         return resource;
     }

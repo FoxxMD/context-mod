@@ -1247,8 +1247,6 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
 
     let cache: StrongCache;
     let defaultProvider: CacheOptions;
-    let opActionedEventsMax: number | undefined;
-    let opActionedEventsDefault: number = 25;
 
     const dataDir = process.env.DATA_DIR ?? defaultDataDir;
 
@@ -1260,16 +1258,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         cache = {
             ...cacheTTLDefaults,
             provider: defaultProvider,
-            actionedEventsDefault: opActionedEventsDefault,
         };
 
     } else {
-        const {provider, actionedEventsMax, actionedEventsDefault = opActionedEventsDefault, ...restConfig} = opCache;
-
-        if (actionedEventsMax !== undefined && actionedEventsMax !== null) {
-            opActionedEventsMax = actionedEventsMax;
-            opActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
-        }
+        const {provider, ...restConfig} = opCache;
 
         if (typeof provider === 'string') {
             defaultProvider = {
@@ -1287,8 +1279,6 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         cache = {
             ...cacheTTLDefaults,
             ...restConfig,
-            actionedEventsMax: opActionedEventsMax,
-            actionedEventsDefault: opActionedEventsDefault,
             provider: defaultProvider,
         }
     }
@@ -1427,8 +1417,6 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
     const {
         snoowrap: snoowrapOp,
         caching: {
-            actionedEventsMax: opActionedEventsMax,
-            actionedEventsDefault: opActionedEventsDefault = 25,
             provider: defaultProvider,
         } = {},
         userAgent,
@@ -1483,28 +1471,18 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
 
         botCache = {
             ...cacheTTLDefaults,
-            actionedEventsDefault: opActionedEventsDefault,
-            actionedEventsMax: opActionedEventsMax,
             provider: {...defaultProvider as CacheOptions}
         };
     } else {
         const {
             provider,
-            actionedEventsMax = opActionedEventsMax,
-            actionedEventsDefault = opActionedEventsDefault,
             ...restConfig
         } = caching;
-
-        botActionedEventsDefault = actionedEventsDefault;
-        if (actionedEventsMax !== undefined) {
-            botActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
-        }
 
         if (typeof provider === 'string') {
             botCache = {
                 ...cacheTTLDefaults,
                 ...restConfig,
-                actionedEventsDefault: botActionedEventsDefault,
                 provider: {
                     store: provider as CacheProvider,
                     ...cacheOptDefaults
@@ -1515,8 +1493,6 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             botCache = {
                 ...cacheTTLDefaults,
                 ...restConfig,
-                actionedEventsDefault: botActionedEventsDefault,
-                actionedEventsMax,
                 provider: {
                     store,
                     ...cacheOptDefaults,

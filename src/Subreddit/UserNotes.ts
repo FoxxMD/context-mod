@@ -16,6 +16,7 @@ import {Cache} from 'cache-manager';
 import {isScopeError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {UserNoteType} from "../Common/Infrastructure/Atomic";
+import {CMCache} from "../Common/Cache";
 
 interface RawUserNotesPayload {
     ver: number,
@@ -67,7 +68,7 @@ export class UserNotes {
     moderators?: RedditUser[];
     logger: Logger;
     identifier: string;
-    cache: Cache
+    cache: CMCache
     cacheCB: Function;
     mod?: RedditUser;
 
@@ -77,7 +78,7 @@ export class UserNotes {
     debounceCB: any;
     batchCount: number = 0;
 
-    constructor(ttl: number | boolean, subreddit: string, client: Snoowrap, logger: Logger, cache: Cache, cacheCB: Function) {
+    constructor(ttl: number | boolean, subreddit: string, client: Snoowrap, logger: Logger, cache: CMCache, cacheCB: Function) {
         this.notesTTL = ttl === true ? 0 : ttl;
         this.subreddit = client.getSubreddit(subreddit);
         this.logger = logger;

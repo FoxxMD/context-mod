@@ -49,7 +49,7 @@ import {
     shouldCacheSubredditStateCriteriaResult,
     subredditStateIsNameOnly,
     testMaybeStringRegex,
-    toStrongSubredditState,
+    toStrongSubredditState, toStrongTTLConfig,
     truncateStringToLength,
     userNoteCriteriaSummary
 } from "../util";
@@ -158,6 +158,7 @@ import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {ActivitySource} from "../Common/ActivitySource";
 import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
 import {SubredditStats} from "./Stats";
+import {CMCache} from "../Common/Cache";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -168,18 +169,14 @@ export class SubredditResources {
     protected useSubredditAuthorCache!: boolean;
     name: string;
     botName: string;
-    protected logger: Logger;
+    logger: Logger;
     userNotes: UserNotes;
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
     database: DataSource
     client: ExtendedSnoowrap
-    cache: Cache
-    cacheType: string
+    cache: CMCache
     cacheSettingsHash?: string;
-    pruneInterval?: any;
-    prefix?: string
-    actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
     botAccount?: string;
@@ -195,23 +192,12 @@ export class SubredditResources {
         const {
             subreddit,
             logger,
-            ttl: {
-                userNotesTTL = cacheTTLDefaults.userNotesTTL,
-                authorTTL = cacheTTLDefaults.authorTTL,
-                wikiTTL = cacheTTLDefaults.wikiTTL,
-                filterCriteriaTTL = cacheTTLDefaults.filterCriteriaTTL,
-                selfTTL = cacheTTLDefaults.selfTTL,
-                submissionTTL = cacheTTLDefaults.submissionTTL,
-                commentTTL = cacheTTLDefaults.commentTTL,
-                subredditTTL = cacheTTLDefaults.subredditTTL,
-                modNotesTTL = cacheTTLDefaults.modNotesTTL,
-            },
+            ttl,
             botName,
             database,
             cache,
             prefix,
             cacheType,
-            actionedEventsMax,
             cacheSettingsHash,
             client,
             thirdPartyCredentials,
@@ -220,7 +206,8 @@ export class SubredditResources {
             managerEntity,
             botEntity,
             statFrequency,
-            retention
+            retention,
+            footer = DEFAULT_FOOTER,
         } = options || {};
 
         this.managerEntity = managerEntity;
@@ -228,26 +215,12 @@ export class SubredditResources {
         this.botName = botName;
         this.delayedItems = delayedItems;
         this.cacheSettingsHash = cacheSettingsHash;
-        this.cache = cache;
         this.database = database;
         this.dispatchedActivityRepo = this.database.getRepository(DispatchedEntity);
         this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
         this.retention = retention;
-        this.prefix = prefix;
+        //this.prefix = prefix;
         this.client = client;
-        this.cacheType = cacheType;
-        this.actionedEventsMax = actionedEventsMax;
-        this.ttl = {
-            authorTTL: authorTTL === true ? 0 : authorTTL,
-            submissionTTL: submissionTTL === true ? 0 : submissionTTL,
-            commentTTL: commentTTL === true ? 0 : commentTTL,
-            subredditTTL: subredditTTL === true ? 0 : subredditTTL,
-            wikiTTL: wikiTTL === true ? 0 : wikiTTL,
-            filterCriteriaTTL: filterCriteriaTTL === true ? 0 : filterCriteriaTTL,
-            modNotesTTL: modNotesTTL === true ? 0 : modNotesTTL,
-            selfTTL: selfTTL === true ? 0 : selfTTL,
-            userNotesTTL: userNotesTTL === true ? 0 : userNotesTTL,
-        }
         this.subreddit = subreddit;
         this.thirdPartyCredentials = thirdPartyCredentials;
         this.name = name;
@@ -258,47 +231,84 @@ export class SubredditResources {
         } else {
             this.logger = logger.child({labels: ['Resources']}, mergeArr);
         }
+        this.cache = cache;
+        this.cache.setLogger(this.logger);
 
         this.subredditStats = new SubredditStats(database, managerEntity, cache, statFrequency, this.logger);
 
         const cacheUseCB = (miss: boolean) => {
             this.subredditStats.incrementCacheTypeStat('userNotes', undefined, miss);
         }
-        this.userNotes = new UserNotes(userNotesTTL, this.subreddit.display_name, this.client, this.logger, this.cache, cacheUseCB)
 
-        if(this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
-            const min = Math.min(...([this.ttl.wikiTTL, this.ttl.authorTTL, this.ttl.submissionTTL, this.ttl.commentTTL, this.ttl.filterCriteriaTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
-            if(min > 0) {
-                // set default prune interval
-                this.pruneInterval = setInterval(() => {
-                    // @ts-ignore
-                    this.cache?.store.prune();
-                    this.logger.debug('Pruned cache');
-                    // prune interval should be twice the smallest TTL
-                },min * 1000 * 2)
-            }
+        this.ttl = ttl;
+        this.thirdPartyCredentials = thirdPartyCredentials;
+        this.footer = footer;
+        this.setRetention(retention, true);
+
+        this.userNotes = new UserNotes(this.ttl.userNotesTTL, this.subreddit.display_name, this.client, this.logger, this.cache, cacheUseCB)
+    }
+
+    async configure(options: SubredditResourceOptions) {
+        const {
+            ttl,
+            retention,
+            thirdPartyCredentials,
+            footer = DEFAULT_FOOTER,
+            statFrequency,
+        } = options;
+
+        this.ttl = ttl;
+        this.thirdPartyCredentials = thirdPartyCredentials;
+        this.footer = footer;
+        let forceStatInit = false;
+        if(this.subredditStats.statFrequency !== statFrequency) {
+            await this.subredditStats.destroy();
+            this.subredditStats.statFrequency = statFrequency;
+            forceStatInit = true;
         }
 
-        if(this.retention === undefined) {
-            this.logger.verbose('Events will be stored in database indefinitely.', {leaf: 'Event Retention'});
-        } else if(typeof this.retention === 'number') {
-            this.logger.verbose(`Will retain the last ${this.retention} events in database`, {leaf: 'Event Retention'});
-        } else {
-            try {
-                const dur = parseDurationValToDuration(this.retention as DurationVal);
-                this.logger.verbose(`Will retain events processed within the last ${dur.humanize()} in database`, {leaf: 'Event Retention'});
-            } catch (e) {
-                this.retention = undefined;
-                this.logger.error(new ErrorWithCause('Could not parse retention as a valid duration. Retention enforcement is disabled.', {cause: e}));
+        if(!options.cache.equalProvider(this.cache.providerOptions)) {
+            this.cache = options.cache;
+            this.cache.setLogger(this.logger);
+            this.subredditStats = new SubredditStats(this.database, this.managerEntity, this.cache, statFrequency, this.logger);
+        }
+
+        await this.subredditStats.initStats(forceStatInit);
+        if(this.subredditStats.historicalSaveInterval === undefined) {
+            this.subredditStats.setHistoricalSaveInterval();
+        }
+        await this.initDatabaseDelayedActivities();
+        this.setRetention(retention);
+    }
+
+    setRetention(retention?: EventRetentionPolicyRange, init = false) {
+        const hashableRetention = retention ?? null;
+        const hashableExistingRetention = this.retention ?? null;
+
+        if(init || (objectHash.sha1(hashableRetention) !== objectHash.sha1(hashableExistingRetention))) {
+            this.retention = retention;
+            if(this.retention === undefined) {
+                this.logger.verbose('Events will be stored in database indefinitely.', {leaf: 'Event Retention'});
+            } else if(typeof this.retention === 'number') {
+                this.logger.verbose(`Will retain the last ${this.retention} events in database`, {leaf: 'Event Retention'});
+            } else {
+                try {
+                    const dur = parseDurationValToDuration(this.retention as DurationVal);
+                    this.logger.verbose(`Will retain events processed within the last ${dur.humanize()} in database`, {leaf: 'Event Retention'});
+                } catch (e) {
+                    this.retention = undefined;
+                    this.logger.error(new ErrorWithCause('Could not parse retention as a valid duration. Retention enforcement is disabled.', {cause: e}));
+                }
             }
         }
     }
 
     async destroy() {
-        if(this.pruneInterval !== undefined && this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
-            clearInterval(this.pruneInterval);
-            this.cache?.reset();
-        }
+        // if(this.pruneInterval !== undefined && this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
+        //     clearInterval(this.pruneInterval);
+        //     this.cache?.reset();
+        // }
+        await this.cache.destroy();
         await this.subredditStats.destroy();
     }
 
@@ -458,95 +468,17 @@ export class SubredditResources {
     }
 
     async getCacheKeyCount() {
-        if (this.cache.store.keys !== undefined) {
-            if(this.cacheType === 'redis') {
-                const keys = await this.cache.store.keys(`${this.prefix}*`);
-                return keys.length;
-            }
-            return (await this.cache.store.keys()).length;
-        }
-        return 0;
-    }
-
-    async interactWithCacheByKeyPattern(pattern: string | RegExp, action: 'get' | 'delete') {
-        let patternIsReg = pattern instanceof RegExp;
-        let regPattern: RegExp;
-        let globPattern = pattern;
-
-        const cacheDict: Record<string, any> = {};
-
-        if (typeof pattern === 'string') {
-            const possibleRegPattern = parseStringToRegex(pattern, 'ig');
-            if (possibleRegPattern !== undefined) {
-                regPattern = possibleRegPattern;
-                patternIsReg = true;
-            } else {
-                if (this.prefix !== undefined && !pattern.includes(this.prefix)) {
-                    // need to add wildcard to beginning of pattern so that the regex will still match a key with a prefix
-                    globPattern = `${this.prefix}${pattern}`;
-                }
-                // @ts-ignore
-                const result = globrex(globPattern, {flags: 'i'});
-                regPattern = result.regex;
-            }
-        } else {
-            regPattern = pattern;
-        }
-
-        if (this.cacheType === 'redis') {
-            // @ts-ignore
-            const redisClient = this.cache.store.getClient();
-            if (patternIsReg) {
-                // scan all and test key by regex
-                for await (const key of redisClient.scanIterator()) {
-                    if (regPattern.test(key) && (this.prefix === undefined || key.includes(this.prefix))) {
-                        if (action === 'delete') {
-                            await redisClient.del(key)
-                        } else {
-                            cacheDict[key] = await redisClient.get(key);
-                        }
-                    }
-                }
-            } else {
-                // not a regex means we can use glob pattern (more efficient!)
-                for await (const key of redisScanIterator(redisClient, { MATCH: globPattern })) {
-                    if (action === 'delete') {
-                        await redisClient.del(key)
-                    } else {
-                        cacheDict[key] = await redisClient.get(key);
-                    }
-                }
-            }
-        } else if (this.cache.store.keys !== undefined) {
-            for (const key of await this.cache.store.keys()) {
-                if (regPattern.test(key) && (this.prefix === undefined || key.includes(this.prefix))) {
-                    if (action === 'delete') {
-                        await this.cache.del(key)
-                    } else {
-                        cacheDict[key] = await this.cache.get(key);
-                    }
-                }
-            }
-        }
-        return cacheDict;
-    }
-
-    async deleteCacheByKeyPattern(pattern: string | RegExp) {
-        return await this.interactWithCacheByKeyPattern(pattern, 'delete');
-    }
-
-    async getCacheByKeyPattern(pattern: string | RegExp) {
-        return await this.interactWithCacheByKeyPattern(pattern, 'get');
+       return this.cache.getCacheKeyCount();
     }
 
     async resetCacheForItem(item: Comment | Submission | RedditUser) {
         if (asActivity(item)) {
             if (this.ttl.filterCriteriaTTL !== false) {
-                await this.deleteCacheByKeyPattern(`itemCrit-${item.name}*`);
+                await this.cache.deleteCacheByKeyPattern(`itemCrit-${item.name}*`);
             }
             await this.setActivity(item, false);
         } else if (isUser(item) && this.ttl.filterCriteriaTTL !== false) {
-            await this.deleteCacheByKeyPattern(`authorCrit-*-${getActivityAuthorName(item)}*`);
+            await this.cache.deleteCacheByKeyPattern(`authorCrit-*-${getActivityAuthorName(item)}*`);
         }
     }
 

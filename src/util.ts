@@ -14,7 +14,6 @@ import {
     ActionResult,
     ActivityDispatch,
     ActivityDispatchConfig,
-    CacheOptions,
     CheckSummary,
     ImageComparisonResult,
     ItemCritPropHelper,
@@ -31,15 +30,13 @@ import {
     RuleSetResult,
     RunResult,
     SearchAndReplaceRegExp,
-    StringComparisonOptions
+    StringComparisonOptions, StrongTTLConfig, TTLConfig
 } from "./Common/interfaces";
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {accessSync, constants, promises} from "fs";
-import {cacheOptDefaults, VERSION} from "./Common/defaults";
-import cacheManager, {Cache} from "cache-manager";
-import redisStore from "cache-manager-redis-store";
+import {cacheTTLDefaults, VERSION} from "./Common/defaults";
+import cacheManager from "cache-manager";
 import Autolinker from 'autolinker';
-import {create as createMemoryStore} from './Utils/memoryStore';
 import {LEVEL, MESSAGE} from "triple-beam";
 import {Comment, PrivateMessage, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
@@ -71,9 +68,9 @@ import {
     UserNoteCriteria
 } from "./Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySourceValue,
+    ActivitySourceData,
     ActivitySourceTypes,
-    CacheProvider,
+    ActivitySourceValue,
     ConfigFormat,
     DurationVal,
     ExternalUrlContext,
@@ -81,13 +78,13 @@ import {
     ModUserNoteLabel,
     modUserNoteLabels,
     RedditEntity,
-    RedditEntityType, RelativeDateTimeMatch,
+    RedditEntityType,
+    RelativeDateTimeMatch,
     statFrequencies,
     StatisticFrequency,
     StatisticFrequencyOption,
     UrlContext,
-    WikiContext,
-    ActivitySourceData
+    WikiContext
 } from "./Common/Infrastructure/Atomic";
 import {
     AuthorOptions,
@@ -1765,40 +1762,30 @@ export const cacheStats = (): ResourceStats => {
     };
 }
 
-export const buildCacheOptionsFromProvider = (provider: CacheProvider | any): CacheOptions => {
-    if(typeof provider === 'string') {
-        return {
-            store: provider as CacheProvider,
-            ...cacheOptDefaults
-        }
-    }
-    return {
-        store: 'memory',
-        ...cacheOptDefaults,
-        ...provider,
-    }
-}
+export const toStrongTTLConfig = (data: TTLConfig): StrongTTLConfig => {
+    const {
+        userNotesTTL = cacheTTLDefaults.userNotesTTL,
+        authorTTL = cacheTTLDefaults.authorTTL,
+        wikiTTL = cacheTTLDefaults.wikiTTL,
+        filterCriteriaTTL = cacheTTLDefaults.filterCriteriaTTL,
+        selfTTL = cacheTTLDefaults.selfTTL,
+        submissionTTL = cacheTTLDefaults.submissionTTL,
+        commentTTL = cacheTTLDefaults.commentTTL,
+        subredditTTL = cacheTTLDefaults.subredditTTL,
+        modNotesTTL = cacheTTLDefaults.modNotesTTL,
+    } = data;
 
-export const createCacheManager = (options: CacheOptions): Cache => {
-    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db, ...rest} = options;
-    switch (store) {
-        case 'none':
-            return cacheManager.caching({store: 'none', max, ttl});
-        case 'redis':
-            return cacheManager.caching({
-                store: redisStore,
-                host,
-                port,
-                auth_pass,
-                db,
-                ttl,
-                ...rest,
-            });
-        case 'memory':
-        default:
-            //return cacheManager.caching({store: 'memory', max, ttl});
-            return cacheManager.caching({store: {create: createMemoryStore}, max, ttl, shouldCloneBeforeSet: false});
-    }
+    return {
+        authorTTL: authorTTL === true ? 0 : authorTTL,
+        submissionTTL: submissionTTL === true ? 0 : submissionTTL,
+        commentTTL: commentTTL === true ? 0 : commentTTL,
+        subredditTTL: subredditTTL === true ? 0 : subredditTTL,
+        wikiTTL: wikiTTL === true ? 0 : wikiTTL,
+        filterCriteriaTTL: filterCriteriaTTL === true ? 0 : filterCriteriaTTL,
+        modNotesTTL: modNotesTTL === true ? 0 : modNotesTTL,
+        selfTTL: selfTTL === true ? 0 : selfTTL,
+        userNotesTTL: userNotesTTL === true ? 0 : userNotesTTL,
+    };
 }
 
 export const randomId = () => crypto.randomBytes(20).toString('hex');

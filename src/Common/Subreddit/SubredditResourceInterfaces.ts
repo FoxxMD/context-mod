@@ -1,4 +1,11 @@
-import {ActivityDispatch, CacheConfig, Footer, ThirdPartyCredentialsJsonConfig, TTLConfig} from "../interfaces";
+import {
+    ActivityDispatch,
+    CacheConfig,
+    Footer,
+    StrongTTLConfig,
+    ThirdPartyCredentialsJsonConfig,
+    TTLConfig
+} from "../interfaces";
 import {Cache} from "cache-manager";
 import {Subreddit} from "snoowrap/dist/objects";
 import {DataSource} from "typeorm";
@@ -7,10 +14,11 @@ import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import {ManagerEntity} from "../Entities/ManagerEntity";
 import {Bot} from "../Entities/Bot";
 import {EventRetentionPolicyRange, StatisticFrequencyOption} from "../Infrastructure/Atomic";
+import {CMCache} from "../Cache";
 
 export interface SubredditResourceOptions extends Footer {
-    ttl: Required<TTLConfig>
-    cache: Cache
+    ttl: StrongTTLConfig
+    cache: CMCache
     cacheType: string;
     cacheSettingsHash: string
     subreddit: Subreddit,
@@ -18,7 +26,6 @@ export interface SubredditResourceOptions extends Footer {
     logger: Logger;
     client: ExtendedSnoowrap;
     prefix?: string;
-    actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
     delayedItems?: ActivityDispatch[]
     botAccount?: string
@@ -27,6 +34,7 @@ export interface SubredditResourceOptions extends Footer {
     botEntity: Bot
     statFrequency: StatisticFrequencyOption
     retention?: EventRetentionPolicyRange
+    footer?: false | string
 }
 
 export interface SubredditResourceConfig extends Footer {

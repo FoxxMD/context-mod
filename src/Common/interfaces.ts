@@ -481,7 +481,7 @@ export interface TTLConfig {
     modNotesTTL?: number | boolean;
 }
 
-export type StrongTTLConfig = Record<keyof TTLConfig, number | false>;
+export type StrongTTLConfig = Record<keyof Required<TTLConfig>, number | false>;
 
 export interface CacheConfig extends TTLConfig {
     /**
@@ -492,32 +492,9 @@ export interface CacheConfig extends TTLConfig {
      * To specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`
      * */
     provider?: CacheProvider | CacheOptions
-
-    /**
-     * The **maximum** number of Events that the cache should store triggered result summaries for
-     *
-     * These summaries are viewable through the Web UI.
-     *
-     * The value specified by a subreddit cannot be larger than the value set by the Operator for the global/bot config (if set)
-     *
-     * @default 25
-     * @example [25]
-     * */
-    actionedEventsMax?: number
 }
 
 export interface OperatorCacheConfig extends CacheConfig {
-    /**
-     * The **default** number of Events that the cache will store triggered result summaries for
-     *
-     * These summaries are viewable through the Web UI.
-     *
-     * The value specified cannot be larger than `actionedEventsMax` for the global/bot config (if set)
-     *
-     * @default 25
-     * @example [25]
-     * */
-    actionedEventsDefault?: number
 }
 
 export interface Footer {
@@ -755,8 +732,6 @@ export type StrongCache = {
     modNotesTTL: number | boolean,
     filterCriteriaTTL: number | boolean,
     provider: CacheOptions
-    actionedEventsMax?: number,
-    actionedEventsDefault: number,
 }
 
 /**
