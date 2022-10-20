@@ -651,6 +651,33 @@ export interface ManagerOptions {
      *
      * */
     retention?: EventRetentionPolicyRange
+
+    /**
+     * Enables config sharing
+     *
+     * * (Default) When `false` sharing is not enabled
+     * * When `true` any bot that can access this bot's config wiki page can use inpm t
+     * * When an object, use `include` or `exclude` to define subreddits that can access this config
+     * */
+    sharing?: boolean | string[] | SharingACLConfig
+}
+
+export interface SharingACLConfig {
+    /**
+     * A list of subreddits, or regular expressions for subreddit names, that are allowed to access this config
+     * */
+    include?: string[]
+    /**
+     * A list of subreddits, or regular expressions for subreddit names, that are NOT allowed to access this config
+     *
+     * If `include` is defined this property is ignored
+     * */
+    exclude?: string[]
+}
+
+export interface StrongSharingACLConfig {
+    include?: RegExp[]
+    exclude?: RegExp[]
 }
 
 export interface ThresholdCriteria {

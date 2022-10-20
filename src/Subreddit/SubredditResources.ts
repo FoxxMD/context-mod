@@ -1338,7 +1338,7 @@ export class SubredditResources {
         return filteredListing;
     }
 
-    async getExternalResource(val: string, options: ExternalResourceOptions = {}): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+    async getExternalResource(val: string, options: ExternalResourceOptions = {}): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string, subreddit?: string }> {
         const {defaultTo} = options;
         let wikiContext = parseWikiContext(val);
 
@@ -1353,7 +1353,8 @@ export class SubredditResources {
         }
 
         if (wikiContext !== undefined) {
-            return await this.getWikiPage(wikiContext, options);
+            const res = await this.getWikiPage(wikiContext, options);
+            return {...res, subreddit: wikiContext.subreddit ?? this.subreddit.display_name};
         }
         if (extUrl !== undefined) {
             return await this.getCachedUrlResult(extUrl, options);
@@ -1386,7 +1387,7 @@ export class SubredditResources {
         }
     }
 
-    async getWikiPage(data: WikiContext, options: ExternalResourceOptions = {}): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string, wikiPage?: WikiPage}> {
+    async getWikiPage(data: WikiContext, options: ExternalResourceOptions = {}): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string, subreddit?: string, wikiPage?: WikiPage}> {
         const {subreddit: subredditArg, force = false, shared = false } = options;
         const {
             subreddit = subredditArg !== undefined ? subredditArg.display_name : this.subreddit.display_name,
@@ -1474,7 +1475,7 @@ export class SubredditResources {
             ttl = 60,
         } = includesData;
 
-        const {val: configStr, fromCache, hash, response} = await this.getExternalResource(path, {shared: true});
+        const {val: configStr, fromCache, hash, response, subreddit} = await this.getExternalResource(path, {shared: true});
 
         const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(configStr);
         if (configObj === undefined) {
@@ -1489,7 +1490,7 @@ export class SubredditResources {
         // otherwise now we want to validate it if a function is present
         if(parseFunc !== undefined) {
             try {
-                validatedData = parseFunc(configObj.toJS(), fromCache) as unknown as T;
+                validatedData = parseFunc(configObj.toJS(), fromCache, subreddit) as unknown as T;
             } catch (e) {
                 throw e;
             }

@@ -29,8 +29,8 @@ import {
     RuleResult,
     RuleSetResult,
     RunResult,
-    SearchAndReplaceRegExp,
-    StringComparisonOptions, StrongTTLConfig, TTLConfig
+    SearchAndReplaceRegExp, SharingACLConfig,
+    StringComparisonOptions, StrongSharingACLConfig, StrongTTLConfig, TTLConfig
 } from "./Common/interfaces";
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {accessSync, constants, promises} from "fs";
@@ -3024,4 +3024,19 @@ export const asStrongImageHashCache = (data: ImageHashCacheData): data is Requir
 export const generateFullWikiUrl = (subreddit: Subreddit | string, location: string) => {
     const subName = subreddit instanceof Subreddit ? subreddit.url : `r/${subreddit}/`;
     return `https://reddit.com${subName}wiki/${location}`
+}
+
+export const toStrongSharingACLConfig = (data: SharingACLConfig | string[]): StrongSharingACLConfig => {
+    if (Array.isArray(data)) {
+        return {
+            include: data.map(x => parseStringToRegexOrLiteralSearch(x))
+        }
+    } else if (data.include !== undefined) {
+        return {
+            include: data.include.map(x => parseStringToRegexOrLiteralSearch(x))
+        }
+    }
+    return {
+        exclude: (data.exclude ?? []).map(x => parseStringToRegexOrLiteralSearch(x))
+    }
 }

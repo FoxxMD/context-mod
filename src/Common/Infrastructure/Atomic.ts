@@ -294,7 +294,7 @@ export type UserNoteType =
 
 export const userNoteTypes = ['gooduser', 'spamwatch', 'spamwarn', 'abusewarn', 'ban', 'permban', 'botban'];
 
-export type ConfigFragmentParseFunc = (data: object, fetched: boolean) => object | object[];
+export type ConfigFragmentParseFunc = (data: object, fetched: boolean, subreddit?: string) => object | object[];
 
 export interface WikiContext {
     wiki: string

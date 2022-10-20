@@ -8,7 +8,7 @@ import {
     overwriteMerge,
     parseBool, parseExternalUrl, parseUrlContext, parseWikiContext, randomId,
     readConfigFile,
-    removeUndefinedKeys, resolvePathFromEnvWithRelative
+    removeUndefinedKeys, resolvePathFromEnvWithRelative, toStrongSharingACLConfig
 } from "./util";
 
 import Ajv, {Schema} from 'ajv';
@@ -41,7 +41,7 @@ import {
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
     OperatorFileConfig,
-    PostBehavior
+    PostBehavior, SharingACLConfig
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetConfigData, RuleSetConfigHydratedData, RuleSetConfigObject} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -169,7 +169,7 @@ export class ConfigBuilder {
         return validateJson<SubredditConfigData>(config, appSchema, this.logger);
     }
 
-    async hydrateConfigFragment<T>(val: IncludesData | string | object, resource: SubredditResources, parseFunc?: ConfigFragmentParseFunc): Promise<T[]> {
+    async hydrateConfigFragment<T>(val: IncludesData | string | object, resource: SubredditResources, parseFunc?: ConfigFragmentParseFunc, subreddit?: string): Promise<T[]> {
         let includes: IncludesData | undefined = undefined;
         if(typeof val === 'string') {
             const strContextResult = parseUrlContext(val);
@@ -230,7 +230,24 @@ export class ConfigBuilder {
             let hydratedRunArr: RunConfigData | RunConfigData[];
 
             try {
-                hydratedRunArr = await this.hydrateConfigFragment<RunConfigData>(r, resource, <RunConfigData>(data: any, fetched: boolean) => {
+                hydratedRunArr = await this.hydrateConfigFragment<RunConfigData>(r, resource, <RunConfigData>(data: any, fetched: boolean, subreddit?: string) => {
+                    if(data.runs !== undefined && subreddit !== undefined) {
+                        const sharing: boolean | SharingACLConfig = data.sharing ?? false;
+                        if(sharing === false) {
+                            throw new ConfigParseError(`The resource defined at ${r} does not have sharing enabled.`);
+                        } else if(sharing !== true) {
+                            const strongAcl = toStrongSharingACLConfig(sharing);
+                            if(strongAcl.include !== undefined) {
+                                if(!strongAcl.include.some(x => x.test(resource.subreddit.display_name))) {
+                                    throw new ConfigParseError(`The resource defined at ${r} does not have sharing enabled for this subreddit.`);
+                                }
+                            } else if(strongAcl.exclude !== undefined) {
+                                if(strongAcl.exclude.some(x => x.test(resource.subreddit.display_name))) {
+                                    throw new ConfigParseError(`The resource defined at ${r} does not have sharing enabled for this subreddit.`);
+                                }
+                            }
+                        }
+                    }
                     const runDataVals = data.runs !== undefined ? data.runs : data;
                     if (!fetched) {
                         if (Array.isArray(runDataVals)) {
