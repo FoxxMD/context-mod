@@ -1,0 +1,31 @@
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+      - name: BotRepost
+        description: Remove submission if it is likely a repost
+        kind: submission
+        rules:
+          # search reddit for similar submissions to see if it is a repost
+          - name: subRepost
+            kind: repost
+            criteria:
+              - searchOn:
+                  # match found Submissions sameness using title against title of Submission being checked
+                  - kind: title
+                    # sameness (confidence) % of a title required to consider Submission being checked as a repost
+                    matchScore: 90
+
+        actions:
+          # report the submission
+          - kind: report
+            enable: true
+            content: '{{rules.subrepost.closestSameness}} confidence this is a repost.'
+
+          # remove the submission
+          - kind: remove
+            enable: false
+            note: '{{rules.subrepost.closestSameness}} confidence this is a repost.'

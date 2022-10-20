@@ -1,0 +1,35 @@
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+      - name: diametricSpam
+        description: Check if author has posted the same image in opposite subs
+        kind: submission
+        enabled: false
+        rules:
+          - name: recent
+            kind: recentActivity
+            useSubmissionAsReference: true
+            # requires your subreddit to be running on a CM instance that supports image processing
+            imageDetection:
+              enable: true
+            threshold: 5
+            lookAt: submissions
+            window: 30
+            thresholds:
+              - threshold: ">= 1"
+                subreddits:
+                  - AnotherSubreddit
+            actions:
+              - kind: remove
+                enable: true
+                content: "Posted same image in {{rules.recent.subSummary}}"
+
+              - kind: comment
+                distinguish: true
+                sticky: true
+                lock: true
+                content: 'You have posted the same image in another subreddit ({{rules.recent.subSummary}}) that does not make sense given the theme of this subreddit. We consider this spam and it has been removed.'

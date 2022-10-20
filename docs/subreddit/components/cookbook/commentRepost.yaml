@@ -1,0 +1,54 @@
+#polling:
+#  - newComm
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+        #
+        # Checks top-level comments on submissions younger than 30 minutes:
+        # * Finds other reddit submissions based on crosspost/duplicates/title/URL, takes top 10 submissions based # of upvotes
+        #   * If this comment matches any comments from those other submissions with at least 85% sameness then it is considered repost
+        #
+        # optionally, bans user if they have more than one modnote for comment reposts
+        #
+      - name: commRepost
+        description: Check if comment has been reposted from youtube
+        kind: comment
+        itemIs:
+          - removed: false
+            approved: false
+            op: false
+            # top level comments only
+            depth: '< 1'
+            submissionState:
+              - age: '< 30 minutes'
+        condition: AND
+        rules:
+          - name: commRepost
+            kind: repost
+            criteria:
+              - searchOn:
+                  - external
+        actions:
+          - kind: remove
+            spam: true
+            note: 'reposted comment from reddit with {{rules.commrepost.closestSameness}}% sameness'
+
+          - kind: ban
+            authorIs:
+              # if the author has more than one spamwatch usernote then just ban em
+              include:
+                - modActions:
+                    - noteType: SPAM_WATCH
+                      note: "/comment repost.*/i"
+                      search: total
+                      count: "> 1"
+            message: You have been banned for repeated spammy behavior including reposting reddit comments
+            note: reddit comment repost + spammy behavior
+            reason: reddit comment repost + spammy behavior
+
+          - name: commRepostModNote
+            kind: modnote
+            content: 'YT comment repost with {{rules.commrepost.closestSameness}}% sameness'
+            type: SPAM_WATCH

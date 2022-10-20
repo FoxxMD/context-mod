@@ -1,0 +1,34 @@
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+        #
+        # Add a mote note to users who are making more than 4 submissions a day
+        # and optionally remove new submissions by them
+        #
+      - name: Flooding New
+        description: Detect users make more than 4 submission in 24 hours
+        kind: submission
+        rules:
+          - name: Recent In Sub
+            kind: recentActivity
+            useSubmissionAsReference: false
+            window:
+              duration: 24 hours
+              fetch: submissions
+            thresholds:
+              - subreddits:
+                  # change this to your subreddit
+                  - MYSUBREDDIT
+                threshold: "> 4"
+        actions:
+          - kind: modnote
+            type: SPAM_WATCH
+            content: '{{rules.recentinsub.totalCount}} submissions in the last 24 hours'
+
+          - kind: remove
+            enable: false
+            note: '{{rules.recentinsub.totalCount}} submissions in the last 24 hours'

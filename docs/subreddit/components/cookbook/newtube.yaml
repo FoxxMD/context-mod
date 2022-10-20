@@ -1,0 +1,55 @@
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+        #
+        # Add a mote note to users who make a submission that is also posted to a 'newtube' subreddit
+        # and optionally remove new submission
+        #
+      - name: Newtube Submission
+        description: Tag user if submission was posted in 'newtube' subreddit
+        kind: submission
+        rules:
+          - name: newTube
+            kind: recentActivity
+            window:
+              count: 100
+              fetch: submissions
+            thresholds:
+              - subreddits:
+                  - AdvertiseYourVideos
+                  - BrandNewTube
+                  - FreeKarma4U
+                  - FreeKarma4You
+                  - KarmaStore
+                  - GetMoreSubsYT
+                  - GetMoreViewsYT
+                  - NewTubers
+                  - promote
+                  - PromoteGamingVideos
+                  - shamelessplug
+                  - SelfPromotionYouTube
+                  - SmallYTChannel
+                  - SmallYoutubers
+                  - upvote
+                  - youtubestartups
+                  - YouTube_startups
+                  - YoutubeSelfPromotions
+                  - YoutubeSelfPromotion
+                  - YouTubeSubscribeBoost
+                  - youtubepromotion
+                  - YTPromo
+                  - Youtubeviews
+                  - YouTube_startups
+        actions:
+          - name: newtubeModTag
+            kind: modnote
+            type: SPAM_WATCH
+            content: 'New Tube => {{rules.newtube.subSummary}}{{rules.newtubeall.subSummary}}'
+
+          - kind: remove
+            enable: false
+            note: 'New Tube => {{rules.newtube.subSummary}}{{rules.newtubeall.subSummary}}'

@@ -40,7 +40,9 @@ runs:
 ```
 </details>
 
-## Submission-based Behavior
+# Recipes
+
+## Spam Prevention
 
 ### Remove submissions from users who have used 'freekarma' subs to bypass karma checks
 
@@ -49,12 +51,79 @@ runs:
 
 If the user has any activity (comment/submission) in known freekarma subreddits in the past (100 activities) then remove the submission.
 
-### Remove submissions from users who have crossposted the same submission 4 or more times
+### Remove submissions that are consecutively spammed by the author
 
 * Type: **Check**
 * [Config](/docs/subreddit/components/cookbook/crosspostSpam.yaml)
 
 If the user has crossposted the same submission in the past (100 activities) 4 or more times in a row then remove the submission.
+
+### Remove submissions if users is flooding new
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/floodingNewSubmissions.yaml)
+
+If the user has made more than 4 submissions in your subreddit in the last 24 hours than new submissions are removed and user is tagged with a modnote.
+
+### Remove submissions posted in diametrically-opposed subreddit
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/diametricSpam.yaml)
+
+If the user makes the same submission to another subreddit(s) that are "thematically" opposed to your subreddit it is probably spam. This check removes it. Detects all types of submissions (including images).
+
+### Remove comments that are consecutively spammed by the author
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/commentSpam.yaml)
+
+If the user made the same comment (with some fuzzy matching) 4 or more times in a row in the past (100 activities or 6 months) then remove the comment.
+
+### Remove comment if it is a chat invite link spam
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/chatSpam.yaml)
+
+This rule goes a step further than automod can by being more discretionary about how it handles this type of spam.
+
+* Remove the comment if:
+  * Comment being checked contains **only** a chat link (no other text) OR
+  * Chat links appear **anywhere** in three or more of the last 100 comments the Author has made
+
+This way ContextMod can more easily distinguish between these use cases for a user commenting with a chat link:
+
+* actual spammers who only spam a chat link
+* users who may comment with a link but have context for it either in the current comment or in their history
+* users who many comment with a link but it's a one-off event (no other links historically)
+
+## Repost Detection
+
+### Remove comments reposted from youtube video submissions
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/youtubeCommentRepost.yaml)
+
+**Requires bot has an API Key for Youtube.**
+
+Removes comment on reddit if the same comment is found on the youtube video the submission is for.
+
+### Remove comments reposted from reddit submissions
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/commentRepost.yaml)
+
+Checks top-level comments on submissions younger than 30 minutes:
+* Finds other reddit submissions based on crosspost/duplicates/title/URL, takes top 10 submissions based # of upvotes
+  * If this comment matches any top comments from those other submissions with at least 85% sameness then it is considered a repost and removed
+
+### Remove reposted reddit submission
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/submissionRepost.yaml)
+
+Checks reddit for top posts with a **Title** that is 90% or more similar to the submission being checked and removes it, if found.
+
+## Self Promotion
 
 ### Remove link submissions where the user's history is comprised of 10% or more of the same link
 
@@ -68,28 +137,54 @@ If the link origin (youtube author, twitter author, etc. or regular domain for n
 
 then remove the submission
 
-## Comment-based behavior
-
-### Remove comment if the user has posted the same comment 4 or more times in a row
+### Remove submissions posted in 'newtube' subreddits
 
 * Type: **Check**
-* [Config](/docs/subreddit/components/cookbook/commentSpam.yaml)
+* [Config](/docs/subreddit/components/cookbook/newtube.yaml)
 
-If the user made the same comment (with some fuzzy matching) 4 or more times in a row in the past (100 activities or 6 months) then remove the comment.
+If the user makes the same submission to a 'newtube' or self-promotional subreddit it is removed and a modnote is added.
 
-### Remove comment if it is chat invite link spam
+## Safety
+
+### Remove comments on brigaded submissions when user has no history
 
 * Type: **Check**
-* [Config](/docs/subreddit/components/cookbook/discordSpam.yaml)
+* [Config](/docs/subreddit/components/cookbook/brigadingNoHistory.yaml)
 
-This rule goes a step further than automod can by being more discretionary about how it handles this type of spam. 
+The users of comments on a brigaded submission (based on a special submission flair) have their comment history checked -- if they have no participation in your subreddit then the comment is removed.
 
-* Remove the comment if:
-  * Comment being checked contains **only** a chat link (no other text) OR
-  * Chat links appear **anywhere** in three or more of the last 100 comments the Author has made
+### Remove submissions from users with a history of sex solicitation 
 
-This way ContextMod can more easily distinguish between these use cases for a user commenting with a chat link:
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/sexSolicitationHistory.yaml)
 
-* actual spammers who only spam a chat link
-* users who may comment with a link but have context for it either in the current comment or in their history
-* users who many comment with a link but it's a one-off event (no other links historically)
+If the author of a submission has submissions in their history that match common reddit "sex solicitation" tags (MFA, R4F, M4F, etc...) the submission is removed and a modnote added.
+
+This is particularly useful for subreddits with underage audiences or mentally/emotionally vulnerable groups. 
+
+The check can be modified to removed comments by changing `kind: submission` to `kind: comment`
+
+## Verification
+
+### Verify users from r/TranscribersOfReddit
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/transcribersOfReddit.yaml)
+
+[r/TranscribersOfReddit](https://www.reddit.com/r/transcribersofreddit) is a community of volunteers transcribing images and videos, across reddit, into plain text.
+
+This Check detects their standard transcription template and also checks they have a history in r/transcribersofreddit -- then approves the comment and flairs the user with **Transcriber ✍️**
+
+### Require submission authors have prior subreddit participation
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/requireNonOPParticipation.yaml)
+
+Submission is removed if the author has **less than 5 non-OP comments** in your subreddit prior to making the submission.
+
+### Require submission authors make a top-level comment with 15 minutes of posting
+
+* Type: **Check**
+* [Config](/docs/subreddit/components/cookbook/requireNonOPParticipation.yaml)
+
+After making a submission the author must make a top-level comment with a regex-checkable pattern within X minutes. If the comment is not made the submission is removed.
