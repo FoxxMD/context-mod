@@ -1,7 +1,10 @@
-polling:
-  - unmoderated
-runs:
-  - checks:
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
       #
       # Stop users who make link submissions with a self-promotional agenda (with reddit's suggested 10% rule)
       # https://www.reddit.com/wiki/selfpromotion#wiki_guidelines_for_self-promotion_on_reddit
@@ -58,8 +61,11 @@ runs:
               ({{rules.attr.window}}{{rules.attrsub.window}}){{#rules.loworopcomm.thresholdSummary}}
               =>
               {{rules.loworopcomm.thresholdSummary}}{{/rules.loworopcomm.thresholdSummary}}
+
           - kind: remove
-            enable: false
+            enable: true
+            note: '>10% of author's history is content from this creator'
+
           - kind: comment
             enable: true
             content: >-
@@ -69,4 +75,3 @@ runs:
               is against [reddit's self promotional
               guidelines.](https://www.reddit.com/wiki/selfpromotion#wiki_guidelines_for_self-promotion_on_reddit)
             distinguish: true
-            dryRun: true

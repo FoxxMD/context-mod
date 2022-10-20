@@ -1377,4 +1377,4 @@ runs:
 
 # Subreddit-Ready Examples
 
-Refer to the [Subreddit-Ready Examples](/docs/subreddit/components/subredditReady) section to find ready-to-use configurations for common scenarios (spam, freekarma blocking, etc...). This is also a good place to familiarize yourself with what complete configurations look like.
+Refer to the [Subreddit Cookbook Examples](/docs/subreddit/components/cookbook) section to find ready-to-use configurations for common scenarios (spam, freekarma blocking, etc...). This is also a good place to familiarize yourself with what complete configurations look like.

@@ -80,7 +80,7 @@ Use the [Configuration Reference](/docs/subreddit/components/README.md) to learn
 
 Additionally, refer to [How It Works](/docs/README.md#how-it-works) and [Core Concepts](/docs/README.md#concepts) to learn the basic of CM configuration.
 
-After you have the basics under your belt you could use the [subreddit-reddit example configurations](/docs/subreddit/components/subredditReady) to familiarize yourself with a complete configuration and ways to use CM.
+After you have the basics under your belt you could use the [subreddit configurations cookbook](/docs/subreddit/components/cookbook) to familiarize yourself with a complete configuration and ways to use CM.
 
 # Guest Access
 

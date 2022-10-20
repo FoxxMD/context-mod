@@ -1,9 +1,18 @@
-polling:
-    - newComm
-runs:
-  - checks:
-      - name: ban discord only spammer
-        description: ban a user who spams only a discord link many times historically
+#polling:
+#  - newComm
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+      #
+      # Remove comments from users who spam discord and telegram links
+      # -- differs from just using automod:
+      # 1) removes comment if it is ONLY discord/telegram link
+      # 2) if not *only* link then checks user's history to see if link is spammed many times and only removes if it is
+      #
+      - name: ban chat only spammer
+        description: ban a user who spams only a chat link many times historically
         kind: comment
         condition: AND
         rules:
@@ -13,9 +22,9 @@ runs:
           - kind: remove
           - kind: ban
             content: spamming discord links
-      - name: remove discord spam
+      - name: remove chat spam
         description: >-
-          remove comments from users who only link to discord or mention discord
+          remove comments from users who only link to chat or mention chat
           link many times historically
         kind: comment
         condition: OR
@@ -24,8 +33,9 @@ runs:
             kind: regex
             criteria:
               - name: only link
+                # https://regexr.com/70j9m
                 # single quotes are required to escape special characters
-                regex: '/^.*(discord\.gg\/[\w\d]+)$/i'
+                regex: '/^\s*((?:discord\.gg|t\.me|telegram\.me|telegr\.im)\/[\w\d]+)\s*$/i'
           - condition: AND
             rules:
               - name: linkAnywhereSpam
@@ -33,15 +43,16 @@ runs:
                 criteria:
                   - name: contains link anywhere
                     # single quotes are required to escape special characters
-                    regex: '/^.*(discord\.gg\/[\w\d]+).*$/i'
+                    regex: '/((?:discord\.gg|t\.me|telegram\.me|telegr\.im)\/[\w\d]+)/i'
               - name: linkAnywhereHistoricalSpam
                 kind: regex
                 criteria:
                   - name: contains links anywhere historically
                     # single quotes are required to escape special characters
-                    regex: '/^.*(discord\.gg\/[\w\d]+).*$/i'
+                    regex: '/((?:discord\.gg|t\.me|telegram\.me|telegr\.im)\/[\w\d]+)/i'
                     totalMatchThreshold: '>= 3'
                     lookAt: comments
-                    window: 10
+                    window: 100
         actions:
           - kind: remove
+            note: Chat spam link
