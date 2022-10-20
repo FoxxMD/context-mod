@@ -53,10 +53,7 @@ import {Submission, Comment, Subreddit} from 'snoowrap/dist/objects';
 import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
 import {
-    BotResourcesManager,
-    SubredditResourceConfig,
-    SubredditResources,
-    SubredditResourceSetOptions
+    SubredditResources
 } from "./SubredditResources";
 import {SPoll, UnmoderatedStream, ModQueueStream, SubmissionStream, CommentStream} from "./Streams";
 import EventEmitter from "events";
@@ -107,6 +104,9 @@ import {InfluxClient} from "../Common/Influx/InfluxClient";
 import { Point } from "@influxdata/influxdb-client";
 import {NormalizedManagerResponse} from "../Web/Common/interfaces";
 import {guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
+import {BotResourcesManager} from "../Bot/ResourcesManager";
+import {SubredditResourceConfig} from "../Common/Subreddit/SubredditResourceInterfaces";
+import objectHash from "object-hash";
 
 export interface RunningState {
     state: RunState,
@@ -210,6 +210,7 @@ export class Manager extends EventEmitter implements RunningStates {
 
     startedAt?: DayjsObj;
     validConfigLoaded: boolean = false;
+    lastParseConfigHash?: string;
 
     eventsState: RunningState = {
         state: STOPPED,
@@ -273,8 +274,8 @@ export class Manager extends EventEmitter implements RunningStates {
             data.historical = this.resources.getHistoricalDisplayStats();
             data.cache = resStats.cache;
             data.cache.currentKeyCount = await this.resources.getCacheKeyCount();
-            data.cache.isShared = this.resources.cacheSettingsHash === 'default';
-            data.cache.provider = this.resources.cacheType;
+            data.cache.isShared = this.resources.cache.isDefaultCache;
+            data.cache.provider = this.resources.cache.providerOptions.store;
         }
         return data;
     }
@@ -381,7 +382,7 @@ export class Manager extends EventEmitter implements RunningStates {
 
         this.eventsSampleInterval = setInterval((function(self) {
             return function() {
-                const et = self.resources !== undefined ? self.resources.stats.historical.eventsCheckedTotal : 0;
+                const et = self.resources !== undefined ? self.resources.subredditStats.stats.historical.eventsCheckedTotal : 0;
                 const rollingSample = self.eventsSample.slice(0, 7)
                 rollingSample.unshift(et)
                 self.eventsSample = rollingSample;
@@ -403,7 +404,7 @@ export class Manager extends EventEmitter implements RunningStates {
         this.rulesUniqueSampleInterval = setInterval((function(self) {
             return function() {
                 const rollingSample = self.rulesUniqueSample.slice(0, 7)
-                const rt = self.resources !== undefined ? self.resources.stats.historical.rulesRunTotal - self.resources.stats.historical.rulesCachedTotal : 0;
+                const rt = self.resources !== undefined ? self.resources.subredditStats.stats.historical.rulesRunTotal - self.resources.subredditStats.stats.historical.rulesCachedTotal : 0;
                 rollingSample.unshift(rt);
                 self.rulesUniqueSample = rollingSample;
                 const diff = self.rulesUniqueSample.reduceRight((acc: number[], curr, index) => {
@@ -700,7 +701,9 @@ export class Manager extends EventEmitter implements RunningStates {
             this.logger.info('Subreddit-specific options updated');
             this.logger.info('Building Runs and Checks...');
 
-            const structuredRuns = await configBuilder.parseToStructured(validJson, this.resources, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
+            const hydratedConfig = await configBuilder.hydrateConfig(validJson, this.resources);
+            this.lastParseConfigHash = objectHash.sha1(hydratedConfig);
+            const structuredRuns = await configBuilder.parseToStructured(hydratedConfig, this.resources, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
 
             let runs: Run[] = [];
 
@@ -805,16 +808,21 @@ export class Manager extends EventEmitter implements RunningStates {
 
     async parseConfiguration(causedBy: Invokee = 'system', force: boolean = false, options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false, suppressChangeEvent = false} = options || {};
+        if(this.resources === undefined) {
+            await this.setResourceManager();
+        }
         //this.wikiUpdateRunning = true;
         this.lastWikiCheck = dayjs();
+        let wikiPageChanged = false;
 
         try {
             let sourceData: string;
             let wiki: WikiPage;
             try {
                 try {
-                    // @ts-ignore
-                    wiki = await this.getWikiPage();
+                    const {val, wikiPage} = await this.resources.getWikiPage({wiki: this.wikiLocation}, {force: true});
+                    wiki = wikiPage as WikiPage;
+                    //sourceData = val as string;
                 } catch (err: any) {
                     if(err.cause !== undefined && isStatusError(err.cause) && err.cause.statusCode === 404) {
                         // try to create it
@@ -828,26 +836,16 @@ export class Manager extends EventEmitter implements RunningStates {
                     }
                 }
                 const revisionDate = dayjs.unix(wiki.revision_date);
-                if (!force && this.validConfigLoaded && (this.lastWikiRevision !== undefined && this.lastWikiRevision.isSame(revisionDate))) {
-                    // nothing to do, we already have this revision
-                    //this.wikiUpdateRunning = false;
-                    if (force) {
-                        this.logger.info('Config is up to date');
+
+                if(this.lastWikiRevision !== undefined) {
+                    if(this.lastWikiRevision.isSame(revisionDate)) {
+                        this.logger.verbose('Config wiki has not changed since last check, going ahead with other checks...');
+                    } else {
+                        wikiPageChanged = true;
+                        this.logger.info(`Updating config due to stale wiki page (${dayjs.duration(dayjs().diff(revisionDate)).humanize()} old)`)
                     }
-                    return false;
-                }
-
-                if (force) {
-                    this.logger.info('Config update was forced');
-                } else if (!this.validConfigLoaded) {
+                } else {
                     this.logger.info('Trying to load (new?) config now since there is no valid config loaded');
-                } else if (this.lastWikiRevision !== undefined) {
-                    this.logger.info(`Updating config due to stale wiki page (${dayjs.duration(dayjs().diff(revisionDate)).humanize()} old)`)
-                }
-
-                if(this.queueState.state === RUNNING) {
-                    this.logger.verbose('Waiting for activity processing queue to pause before continuing config update');
-                    await this.pauseQueue(causedBy);
                 }
 
                 this.lastWikiRevision = revisionDate;
@@ -857,8 +855,8 @@ export class Manager extends EventEmitter implements RunningStates {
             }
 
             if (sourceData.replace('\r\n', '').trim() === '') {
-                this.logger.error(`Wiki page contents was empty`);
-                throw new ConfigParseError('Wiki page contents was empty');
+                this.logger.error(`Wiki page contents is empty. The bot cannot run until this subreddit's wiki page has a valid config added!`);
+                throw new ConfigParseError(`Wiki page contents is empty. The bot cannot run until this subreddit's wiki page has a valid config added!`);
             }
 
             const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(sourceData);
@@ -878,6 +876,23 @@ export class Manager extends EventEmitter implements RunningStates {
                 throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
             }
 
+            if (!wikiPageChanged && this.validConfigLoaded && this.lastParseConfigHash !== undefined && !force) {
+                // need to check if hydrated is different from current
+                const hydratedRuns = await this.buildHydratedRuns(configObj.toJS());
+                const hydratedHash = objectHash.sha1(hydratedRuns);
+                if (hydratedHash === this.lastParseConfigHash) {
+                    this.logger.info('Config is up to date');
+                    return false;
+                } else {
+                    this.logger.info('Hydrated config differed from wiki contents, continuing with update.');
+                }
+            }
+
+            if(this.queueState.state === RUNNING) {
+                this.logger.verbose('Waiting for activity processing queue to pause before continuing config update');
+                await this.pauseQueue(causedBy);
+            }
+
             await this.parseConfigurationFromObject(configObj.toJS(), suppressChangeEvent);
             this.logger.info('Checks updated');
 
@@ -895,6 +910,12 @@ export class Manager extends EventEmitter implements RunningStates {
             this.validConfigLoaded = false;
             throw new ErrorWithCause('Failed to parse subreddit configuration', {cause: err});
         }
+    }
+
+    async buildHydratedRuns(configObj: object) {
+        const configBuilder = new ConfigBuilder({logger: this.logger});
+        const validJson = configBuilder.validateJson(configObj);
+        return await configBuilder.hydrateConfig(validJson, this.resources);
     }
 
     async handleActivity(activity: (Submission | Comment), options: runCheckOptions): Promise<void> {
@@ -974,7 +995,7 @@ export class Manager extends EventEmitter implements RunningStates {
         const itemId = await item.id;
 
         if(await this.resources.hasRecentSelf(item)) {
-            let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
+            let recentMsg = `Found in Activities recently (last ${this.resources.ttl.selfTTL} seconds) modified/created by this bot`;
             if(force) {
                 this.logger.debug(`${recentMsg} but will run anyway because "force" option was true.`);
             } else {
@@ -1876,33 +1897,6 @@ export class Manager extends EventEmitter implements RunningStates {
                 throw err;
             }
         }
-    }
-
-    // @ts-ignore
-    async getWikiPage(location: string = this.wikiLocation) {
-        let wiki: WikiPage;
-        try {
-            // @ts-ignore
-            wiki = await this.subreddit.getWikiPage(location).fetch();
-        } catch (err: any) {
-            if (isStatusError(err)) {
-                const error = err.statusCode === 404 ? 'does not exist' : 'is not accessible';
-                let reasons = [];
-                if (!this.client.scope.includes('wikiread')) {
-                    reasons.push(`Bot does not have 'wikiread' oauth permission`);
-                } else {
-                    const modPermissions = await this.getModPermissions();
-                    if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
-                        reasons.push(`Bot does not have required mod permissions ('all'  or 'wiki') to read restricted wiki pages`);
-                    }
-                }
-
-                throw new CMError(`Wiki page ${generateFullWikiUrl(this.subreddit, location)} ${error} (${err.statusCode})${reasons.length > 0 ? ` because: ${reasons.join(' | ')}` : '.'}`, {cause: err});
-            } else {
-                throw new CMError(`Wiki page ${generateFullWikiUrl(this.subreddit, location)} could not be read`, {cause: err});
-            }
-        }
-        return wiki;
     }
 
     toNormalizedManager(): NormalizedManagerResponse {

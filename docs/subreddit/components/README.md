@@ -70,6 +70,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
     * [Rule Order](#rule-order)
   * [Configuration Re-use and Caching](#configuration-re-use-and-caching)
   * [Partial Configurations](#partial-configurations)
+    * [Sharing Configs Between Subreddits](#sharing-full-configs-as-runs)
 * [Subreddit-ready examples](#subreddit-ready-examples)
 
 # Runs
@@ -1247,6 +1248,49 @@ The object contains:
 * `path` -- REQUIRED string following rules above
 * `ttl` -- OPTIONAL, number of seconds to cache the URL result. Defaults to `WikiTTL`
 
+### Sharing Full Configs as Runs
+
+If the Fragment fetched by CM is a "full config" (including `runs`, `polling`, etc...) that could be used as a valid config for another subreddit then CM will extract and use the **Runs** from that config.
+
+**However, the config must also explicitly allow access for use as a Fragment.** This is to prevent subreddits that share a Bot account from accidentally (or intentionally) gaining access to another subreddit's config with permissions.
+
+#### Sharing
+
+The config that will be shared (accessed at `wiki:botconfig/contextbot|SharingSubreddit`) must have the `sharing` property defined at its top-level. If `sharing` is not defined access will be denied for all subreddits.
+
+```yaml
+sharing: false # deny access to all subreddits (default when sharing is not defined)
+
+polling:
+  - newComm
+
+runs:
+  # ...
+```
+
+```yaml
+sharing: true # any subreddit can use this config (reddit account must also be able to access wiki page)
+```
+
+```yaml
+# when a list is given all subreddit names that match any from the list are ALLOWED to access the config
+# list can be regular expressions or case-insensitive strings
+sharing:
+  - mealtimevideos
+  - videos
+  - '/Ask.*/i' 
+```
+
+```yaml
+# if `exclude` is used then any subreddit name that is NOT on this list can access the config
+# list can be regular expressions or case-insensitive strings
+sharing:
+  exclude:
+    - mealtimevideos
+    - videos
+    - '/Ask.*/i' 
+```
+
 #### Examples
 
 **Replacing A Rule with a URL Fragment**
@@ -1269,7 +1313,7 @@ runs:
             subreddits:
               - MyBadSubreddit
         window: 7 days
-      actions:
+    actions:
       - kind: report
         content: 'uses freekarma subreddits and bad subreddits'
 ```
@@ -1302,6 +1346,33 @@ runs:
     actions:
       - kind: report
         content: 'uses freekarma subreddits'
+```
+
+**Using Another Subreddit's Config**
+
+```yaml
+runs:
+- `wiki:botconfig/contextbot|SharingSubreddit`
+- name: MySubredditSpecificRun
+  checks:
+  - name: Free Karma Alert
+    description: Check if author has posted in 'freekarma' subreddits
+    kind: submission
+    rules:
+      - 'wiki:freeKarmaFrag'
+    actions:
+      - kind: report
+        content: 'uses freekarma subreddits'
+```
+
+In `r/SharingSubreddit`:
+
+```yaml
+sharing: true
+
+runs:
+  - name: ARun
+    # ...
 ```
 
 # Subreddit-Ready Examples
