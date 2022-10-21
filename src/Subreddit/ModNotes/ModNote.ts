@@ -81,7 +81,7 @@ export class ModNote {
             this.createdBy.name = data.operator;
         }
 
-        this.action = new ModAction(data.mod_action_data, client);
+        this.action = new ModAction({...data.mod_action_data, createdBy: this.createdBy, subreddit: this.subreddit}, client);
         if (this.action.actedOn instanceof RedditUser && this.action.actedOn.id === this.user.id) {
             this.action.actedOn = this.user;
         }
