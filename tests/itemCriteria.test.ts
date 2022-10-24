@@ -243,6 +243,16 @@ describe('Item Criteria', function () {
                     [activityPropName]: 'test',
                 }, snoowrap, false), {[prop]: ['foo','test']}, NoopLogger, true)).passed);
             });
+            it(`Should detect specific ${prop}, case-insensitive`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: 'test',
+                }, snoowrap, false), {[prop]: 'TeSt'}, NoopLogger, true)).passed);
+            });
+            it(`Should detect specific ${prop}, when not a regex, is subset of string`, async function () {
+                assert.isTrue((await resource.isItem(new Submission({
+                    [activityPropName]: 'this is a test phrase',
+                }, snoowrap, false), {[prop]: 'test'}, NoopLogger, true)).passed);
+            });
             it(`Should detect specific ${prop} is not in criteria`, async function () {
                 assert.isFalse((await resource.isItem(new Submission({
                     [activityPropName]: 'test',
