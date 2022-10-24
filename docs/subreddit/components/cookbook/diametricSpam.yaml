@@ -8,7 +8,6 @@
       - name: diametricSpam
         description: Check if author has posted the same image in opposite subs
         kind: submission
-        enabled: false
         rules:
           - name: recent
             kind: recentActivity

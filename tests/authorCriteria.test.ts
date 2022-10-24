@@ -16,7 +16,7 @@ import Snoowrap from "snoowrap";
 import {getResource, getSnoowrap, getSubreddit, sampleActivity} from "./testFactory";
 import {Subreddit as SubredditEntity} from "../src/Common/Entities/Subreddit";
 import {Activity} from '../src/Common/Entities/Activity';
-import {cmToSnoowrapActivityMap} from "../src/Common/Infrastructure/Filters/FilterCriteria";
+import {cmToSnoowrapActivityMap, cmToSnoowrapAuthorMap} from "../src/Common/Infrastructure/Filters/FilterCriteria";
 import {SnoowrapActivity} from "../src/Common/Infrastructure/Reddit";
 
 dayjs.extend(dduration);
@@ -89,10 +89,7 @@ describe('Author Criteria', function () {
         });
 
         for(const prop of ['flairCssClass', 'flairTemplate', 'flairText']) {
-            let activityPropName = cmToSnoowrapActivityMap[prop] ?? prop;
-            if(activityPropName === 'link_flair_template_id') {
-                activityPropName = 'author_flair_template_id';
-            }
+            let activityPropName = cmToSnoowrapAuthorMap[prop] ?? prop;
 
             it(`Should detect specific ${prop} as single string`, async function () {
                 assert.isTrue((await resource.isAuthor(testAuthor({}, 'submission',{
@@ -103,6 +100,16 @@ describe('Author Criteria', function () {
                 assert.isTrue((await resource.isAuthor(testAuthor({}, 'submission',{
                     [activityPropName]: 'test',
                 }), {[prop]: ['foo','test']}, true)).passed);
+            });
+            it(`Should detect non-regex specific ${prop} as case-insensitive`, async function () {
+                assert.isTrue((await resource.isAuthor(testAuthor({}, 'submission',{
+                    [activityPropName]: 'TeSt',
+                }), {[prop]: 'test'}, true)).passed);
+            });
+            it(`Should detect non-regex specific ${prop} is a subset of string`, async function () {
+                assert.isTrue((await resource.isAuthor(testAuthor({}, 'submission',{
+                    [activityPropName]: 'This is a test phrase',
+                }), {[prop]: 'test'}, true)).passed);
             });
             it(`Should detect specific ${prop} is not in criteria`, async function () {
                 assert.isFalse((await resource.isAuthor(testAuthor({}, 'submission',{
@@ -125,14 +132,14 @@ describe('Author Criteria', function () {
                     [activityPropName]: '',
                 }), {[prop]: 'foo'}, true)).passed);
             });
-            /*it(`Should detect ${prop} as Regular Expression`, async function () {
-                assert.isTrue((await resource.isItem(new Submission({
-                    [activityPropName]: 'test'
-                }, snoowrap, false), {[prop]: '/te.*!/'}, NoopLogger, true)).passed);
-                assert.isTrue((await resource.isItem(new Submission({
-                    [activityPropName]: 'test'
-                }, snoowrap, false), {[prop]: ['foo', '/t.*!/']}, NoopLogger, true)).passed);
-            });*/
+            it(`Should detect ${prop} as Regular Expression`, async function () {
+                assert.isTrue((await resource.isAuthor(testAuthor({}, 'submission',{
+                    [activityPropName]: 'test',
+                }), {[prop]: '/te.*/'}, true)).passed);
+                assert.isTrue((await resource.isAuthor(testAuthor({}, 'submission',{
+                    [activityPropName]: 'test',
+                }), {[prop]: ['foo','/te.*/']}, true)).passed);
+            });
         }
 
         // TODO isMod

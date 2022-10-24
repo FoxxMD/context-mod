@@ -88,7 +88,7 @@ import {
     asModLogCriteria,
     asModNoteCriteria,
     AuthorCriteria,
-    cmToSnoowrapActivityMap,
+    cmToSnoowrapActivityMap, cmToSnoowrapAuthorMap,
     CommentState,
     ModLogCriteria,
     ModNoteCriteria,
@@ -2503,94 +2503,70 @@ export class SubredditResources {
                             }
                             break;
                         case 'name':
-                            const nameVal = authorOptVal as RequiredAuthorCrit['name'];
-                            const authPass = () => {
+                        case 'flairCssClass':
+                        case 'flairText':
+                        case 'flairTemplate':
+                        case 'flairBackgroundColor':
+                        case 'description':
+                            let actualPropName = cmToSnoowrapAuthorMap[k] ?? k;
 
-                                for (const n of nameVal) {
-                                    if (testMaybeStringRegex(n, authorName)[0]) {
-                                        return true;
+                            let propertyValue: string | null;
+                            if(k === 'name') {
+                                propertyValue = authorName;
+                            } else if(k === 'description') {
+                                // @ts-ignore
+                                propertyValue = (await user()).subreddit?.display_name.public_description;
+                            } else {
+                                // @ts-ignore
+                                propertyValue = await item[actualPropName];
+                            }
+
+                            if(k === 'description' && typeof propertyValue === 'string') {
+                                propResultsMap[k]!.found = truncateStringToLength(50)(propertyValue)
+                            } else {
+                                propResultsMap[k]!.found = propertyValue;
+                            }
+
+                            if (typeof authorOptVal === 'boolean') {
+                                if (authorOptVal === true) {
+                                    propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propertyValue !== undefined && propertyValue !== null && propertyValue !== '', include);
+                                } else {
+                                    propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propertyValue === undefined || propertyValue === null || propertyValue === '', include);
+                                }
+                            } else if (propertyValue === undefined || propertyValue === null || propertyValue === '') {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                propResultsMap[k]!.passed = !include;
+                            } else {
+                                // remove # if comparing hex values
+                                const isHex = k.toLowerCase().includes('background');
+
+                                const expectedValues = (typeof authorOptVal === 'string' ? [authorOptVal] : (authorOptVal as string[])).map(x => isHex ? x.replace('#','').trim() : x.trim());
+                                const cleanProp = isHex ? propertyValue.replace('#','').trim() : propertyValue.trim();
+                                let anyPassed = false;
+                                const errorReasons = [];
+                                for(const expectedVal of expectedValues) {
+                                    try {
+                                        const [regPassed] = testMaybeStringRegex(expectedVal,cleanProp);
+                                        if(regPassed) {
+                                            anyPassed = true;
+                                        }
+                                    } catch (err: any) {
+                                        if(err.message.includes('Could not convert test value')) {
+                                            errorReasons.push(`Could not convert ${expectedVal} to Regex, fallback to simple case-insenstive comparison`);
+                                            // fallback to simple comparison
+                                            anyPassed = expectedVal.toLowerCase() === cleanProp.toLowerCase();
+                                        } else {
+                                            errorReasons.push(err.message);
+                                        }
+                                    }
+                                    if(anyPassed) {
+                                        break;
                                     }
                                 }
-                                return false;
-                            }
-                            const authResult = authPass();
-                            propResultsMap.name!.found = authorName;
-                            propResultsMap.name!.passed = criteriaPassWithIncludeBehavior(authResult, include);
-                            if (!propResultsMap.name!.passed) {
-                                shouldContinue = false;
-                            }
-                            break;
-                        case 'flairCssClass':
-                            const css = await item.author_flair_css_class;
-                            propResultsMap.flairCssClass!.found = css;
-
-                            let cssResult:boolean;
-
-                            if (typeof authorOptVal === 'boolean') {
-                                if (authorOptVal === true) {
-                                    cssResult = css !== undefined && css !== null && css !== '';
-                                } else {
-                                    cssResult = css === undefined || css === null || css === '';
+                                if(errorReasons.length > 0) {
+                                    propResultsMap[k]!.reason = `Some errors occurred while testing: ${errorReasons.join(' | ')}`;
                                 }
-                            } else if (css === undefined || css === null || css === '') {
-                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
-                                cssResult = false;
-                            } else {
-                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
-                                cssResult = opts.some(x => x.trim().toLowerCase() === css.trim().toLowerCase())
-                            }
-
-                            propResultsMap.flairCssClass!.passed = criteriaPassWithIncludeBehavior(cssResult, include);
-                            if (!propResultsMap.flairCssClass!.passed) {
-                                shouldContinue = false;
-                            }
-                            break;
-                        case 'flairText':
-
-                            const text = await item.author_flair_text;
-                            propResultsMap.flairText!.found = text;
-
-                            let textResult: boolean;
-                            if (typeof authorOptVal === 'boolean') {
-                                if (authorOptVal === true) {
-                                    textResult = text !== undefined && text !== null && text !== '';
-                                } else {
-                                    textResult = text === undefined || text === null || text === '';
-                                }
-                            } else if (text === undefined || text === null) {
-                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
-                                textResult = false;
-                            } else {
-                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
-                                textResult = opts.some(x => x.trim().toLowerCase() === text.trim().toLowerCase())
-                            }
-                            propResultsMap.flairText!.passed = criteriaPassWithIncludeBehavior(textResult, include);
-                            if (!propResultsMap.flairText!.passed) {
-                                shouldContinue = false;
-                            }
-                            break;
-                        case 'flairTemplate':
-                            const templateId = await item.author_flair_template_id;
-                            propResultsMap.flairTemplate!.found = templateId;
-
-                            let templateResult: boolean;
-                            if (typeof authorOptVal === 'boolean') {
-                                if (authorOptVal === true) {
-                                    templateResult = templateId !== undefined && templateId !== null && templateId !== '';
-                                } else {
-                                    templateResult = templateId === undefined || templateId === null || templateId === '';
-                                }
-                            } else if (templateId === undefined || templateId === null || templateId === '') {
-                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
-                                templateResult = false;
-                            } else {
-                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
-                                templateResult = opts.some(x => x.trim() === templateId);
-                            }
-
-                            propResultsMap.flairTemplate!.passed = criteriaPassWithIncludeBehavior(templateResult, include);
-                            if (!propResultsMap.flairTemplate!.passed) {
-                                shouldContinue = false;
+                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(anyPassed, include);
                             }
                             break;
                         case 'isMod':
@@ -2678,34 +2654,6 @@ export class SubredditResources {
                             propResultsMap.verified!.passed = criteriaPassWithIncludeBehavior(vMatch, include);
                             if (!propResultsMap.verified!.passed) {
                                 shouldContinue = false;
-                            }
-                            break;
-                        case 'description':
-                            // @ts-ignore
-                            const desc = (await user()).subreddit?.display_name.public_description;
-                            const dVals = authorOpts[k] as string[];
-                            let passed = false;
-                            let passReg;
-                            for (const val of dVals) {
-                                let reg = parseStringToRegex(val, 'i');
-                                if (reg === undefined) {
-                                    reg = parseStringToRegex(`/.*${escapeRegex(val.trim())}.*/`, 'i');
-                                    if (reg === undefined) {
-                                        throw new SimpleError(`Could not convert 'description' value to a valid regex: ${authorOpts[k] as string}`);
-                                    }
-                                }
-                                if (reg.test(desc)) {
-                                    passed = true;
-                                    passReg = reg.toString();
-                                    break;
-                                }
-                            }
-                            propResultsMap.description!.found = typeof desc === 'string' ? truncateStringToLength(50)(desc) : desc;
-                            propResultsMap.description!.passed = criteriaPassWithIncludeBehavior(passed, include);
-                            if (!propResultsMap.description!.passed) {
-                                shouldContinue = false;
-                            } else {
-                                propResultsMap.description!.reason = `Matched with: ${passReg as string}`;
                             }
                             break;
                         case 'userNotes':
