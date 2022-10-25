@@ -143,7 +143,8 @@ Report if MHS flags as toxic with 95% confidence
 ```yaml
 rules:
   - kind: mhs
-    confidence: '>= 95'
+    criteria:
+      confidence: '>= 95'
 actions:
   - kind: report
     content: 'MHS flagged => {{rules.mhs.summary}}'
@@ -168,8 +169,9 @@ Approve if MHS flags as NOT toxic with 95% confidence
 ```yaml
 rules:
   - kind: mhs
-    confidence: '>= 95'
-    flagged: false
+    criteria:
+      confidence: '>= 95'
+      flagged: false
 actions:
   - kind: approve
 ```
