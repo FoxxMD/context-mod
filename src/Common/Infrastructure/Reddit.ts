@@ -1,4 +1,5 @@
 import {Comment, Submission} from "snoowrap/dist/objects";
+import { ValueOf } from "ts-essentials";
 
 export type ActivityType = 'submission' | 'comment';
 export type MaybeActivityType = ActivityType | false;
@@ -21,8 +22,20 @@ export type AuthorHistorySortTime = 'hour' | 'day' | 'week' | 'month' | 'year' |
 export type AuthorHistoryType = 'comment' | 'submission' | 'overview';
 export type SnoowrapActivity = Submission | Comment;
 
+type valueof<T> = T[keyof T]
+
+/*
+* Depending on what caching provider is used the results from cache can either be
+*
+* * full-fat SnoowrapActivities (memory provider keeps everything in memory!)
+* * OR json-serialized objects of the data from those activities (all other cache providers)
+*
+* we don't know which they are until we retrieve them.
+* */
+export type SnoowrapLike = Record<keyof SnoowrapActivity, valueof<SnoowrapActivity>>;
+
 export interface CachedFetchedActivitiesResult {
-    pre: SnoowrapActivity[]
+    pre: SnoowrapActivity[] | SnoowrapLike[]
     rawCount: number
     apiCount: number
     preMaxTrigger?: string | null
@@ -30,6 +43,7 @@ export interface CachedFetchedActivitiesResult {
 
 export interface FetchedActivitiesResult extends CachedFetchedActivitiesResult {
     post: SnoowrapActivity[]
+    pre: SnoowrapActivity[]
 }
 
 export type ReportType = 'mod' | 'user';

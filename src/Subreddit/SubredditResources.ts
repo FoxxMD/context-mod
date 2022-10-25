@@ -1089,9 +1089,14 @@ export class SubredditResources {
 
                     // convert cached activities into snoowrap activities
                     pre = cachedPre.map(x => {
+                        // if cache from memory then activities are still full-fat activities which we can return immediately
+                        if(x instanceof Comment || x instanceof Submission) {
+                            return x;
+                        }
+                        // otherwise we need to reconstruct the objects from json-serialized data
                         const { author: authorName, subreddit: subredditName, ...rest } = x;
-                        const author = new RedditUser({name: authorName }, this.client, false);
-                        const subreddit = new Subreddit({display_name: subredditName as unknown as string}, this.client, false);
+                        const author = new RedditUser({name: getActivityAuthorName(authorName) }, this.client, false);
+                        const subreddit = new Subreddit({display_name: getActivitySubredditName(x)}, this.client, false);
                         if(asSubmission(x)) {
                             const {comments, ...restSub} = rest as Submission;
                             const subData = {...restSub, author, subreddit};
