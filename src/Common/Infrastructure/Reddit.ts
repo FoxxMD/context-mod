@@ -1,4 +1,4 @@
-import {Comment, Submission} from "snoowrap/dist/objects";
+import {Comment, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
 import { ValueOf } from "ts-essentials";
 
 export type ActivityType = 'submission' | 'comment';
@@ -33,6 +33,8 @@ type valueof<T> = T[keyof T]
 * we don't know which they are until we retrieve them.
 * */
 export type SnoowrapLike = Record<keyof SnoowrapActivity, valueof<SnoowrapActivity>>;
+export type RedditUserLike = Record<keyof RedditUser, valueof<RedditUser>>;
+export type SubredditLike = Record<keyof Subreddit, valueof<Subreddit>>;
 
 export interface CachedFetchedActivitiesResult {
     pre: SnoowrapActivity[] | SnoowrapLike[]

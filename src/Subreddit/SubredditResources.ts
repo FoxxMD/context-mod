@@ -136,8 +136,9 @@ import {
     ActivityType,
     AuthorHistorySort,
     CachedFetchedActivitiesResult,
-    FetchedActivitiesResult,
+    FetchedActivitiesResult, RedditUserLike,
     SnoowrapActivity,
+    SubredditLike,
     SubredditRemovalReason
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
@@ -737,10 +738,13 @@ export class SubredditResources {
             if (this.ttl.subredditTTL !== false) {
 
                 hash = `sub-${subName}`;
-                const cachedSubreddit = await this.cache.get(hash);
+                const cachedSubreddit = await this.cache.get(hash) as Subreddit | SubredditLike | null | undefined;
                 if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
                     logger.debug(`Cache Hit: Subreddit ${subName}`);
                     await this.subredditStats.incrementCacheTypeStat('subreddit', hash, false);
+                    if(cachedSubreddit instanceof Subreddit) {
+                        return cachedSubreddit;
+                    }
                     return new Subreddit(cachedSubreddit, this.client, false);
                 }
                 await this.subredditStats.incrementCacheTypeStat('subreddit', hash, true);
@@ -885,11 +889,13 @@ export class SubredditResources {
         const hash = `authorModNotes-${subredditName}-${authorName}`;
 
         if (this.ttl.modNotesTTL !== false) {
-            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | null | undefined;
+            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | ModNote[] | null | undefined;
             if (cachedModNoteData !== undefined && cachedModNoteData !== null) {
                 this.logger.debug(`Cache Hit: Author ModNotes ${authorName} in ${subredditName}`);
-
                 return cachedModNoteData.map(x => {
+                    if(x instanceof ModNote) {
+                        return x;
+                    }
                     const note = new ModNote(x, this.client);
                     note.subreddit = this.subreddit;
                     if (val instanceof RedditUser) {
@@ -934,7 +940,7 @@ export class SubredditResources {
 
         if (this.ttl.modNotesTTL !== false) {
             const hash = `authorModNotes-${this.subreddit.display_name}-${data.user.name}`;
-            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | null | undefined;
+            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | ModNote[] | null | undefined;
             if (cachedModNoteData !== undefined && cachedModNoteData !== null) {
                 this.logger.debug(`Adding new Note ${newNote.id} to Author ${data.user.name} Note cache`);
                 await this.cache.set(hash, [newNote, ...cachedModNoteData], {ttl: this.ttl.modNotesTTL});
@@ -952,9 +958,12 @@ export class SubredditResources {
         }
         const hash = `author-${authorName}`;
         if (this.ttl.authorTTL !== false) {
-            const cachedAuthorData = await this.cache.get(hash);
+            const cachedAuthorData = await this.cache.get(hash) as RedditUser | RedditUserLike | null | undefined;
             if (cachedAuthorData !== undefined && cachedAuthorData !== null) {
                 this.logger.debug(`Cache Hit: Author ${authorName}`);
+                if(cachedAuthorData instanceof RedditUser) {
+                    return cachedAuthorData;
+                }
                 const {subreddit, ...rest} = cachedAuthorData as any;
                 const snoowrapConformedData = {...rest};
                 if(subreddit !== null) {
