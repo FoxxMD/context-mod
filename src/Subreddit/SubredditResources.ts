@@ -2704,7 +2704,7 @@ export class SubredditResources {
                                             break;
                                         case 'current':
                                         case 'total':
-                                            const notesToUse = search === 'current' ? [notes[notes.length - 1]] : notes;
+                                            const notesToUse = search === 'current' && notes.length > 0 ? [notes[notes.length - 1]] : notes;
                                             const filteredNotes = notesToUse.filter(x => x.matches(noteCriteria, item));
                                             if (isPercent) {
                                                 // avoid divide by zero
