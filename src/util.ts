@@ -2475,19 +2475,44 @@ export const mergeFilters = (objectConfig: RunnableBaseJson, filterDefs: FilterC
 
     let derivedAuthorIs: AuthorOptions = buildFilter(authorIsDefault);
     if (authorIsBehavior === 'merge') {
-        derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+        derivedAuthorIs = {
+            excludeCondition: authorIs.excludeCondition ?? derivedAuthorIs.excludeCondition,
+            include: addNonConflictingCriteria(derivedAuthorIs.include, authorIs.include),
+            exclude: addNonConflictingCriteria(derivedAuthorIs.exclude, authorIs.exclude),
+        }
     } else if (!filterIsEmpty(authorIs)) {
         derivedAuthorIs = authorIs;
     }
 
     let derivedItemIs: ItemOptions = buildFilter(itemIsDefault);
     if (itemIsBehavior === 'merge') {
-        derivedItemIs = merge.all([itemIs, itemIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+        derivedItemIs = {
+            excludeCondition: itemIs.excludeCondition ?? derivedItemIs.excludeCondition,
+            include: addNonConflictingCriteria(derivedItemIs.include, itemIs.include),
+            exclude: addNonConflictingCriteria(derivedItemIs.exclude, itemIs.exclude),
+        }
     } else if (!filterIsEmpty(itemIs)) {
         derivedItemIs = itemIs;
     }
 
     return [derivedAuthorIs, derivedItemIs];
+}
+
+export const addNonConflictingCriteria = <T>(defaultCriteria: NamedCriteria<T>[] = [], explicitCriteria: NamedCriteria<T>[] = []): NamedCriteria<T>[] => {
+    if(explicitCriteria.length === 0) {
+        return defaultCriteria;
+    }
+    const allExplicitKeys = Array.from(explicitCriteria.reduce((acc, curr) => {
+        Object.keys(curr.criteria).forEach(key => acc.add(key));
+        return acc;
+    }, new Set()));
+    const nonConflicting = defaultCriteria.filter(x => {
+        return intersect(Object.keys(x.criteria), allExplicitKeys).length === 0;
+    });
+    if(nonConflicting.length > 0) {
+        return explicitCriteria.concat(nonConflicting);
+    }
+    return explicitCriteria;
 }
 
 export const filterIsEmpty = (obj: FilterOptions<any>): boolean => {

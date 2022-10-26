@@ -703,7 +703,7 @@ export class Manager extends EventEmitter implements RunningStates {
 
             const hydratedConfig = await configBuilder.hydrateConfig(validJson, this.resources);
             this.lastParseConfigHash = objectHash.sha1(hydratedConfig);
-            const structuredRuns = await configBuilder.parseToStructured(hydratedConfig, this.resources, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
+            const structuredRuns = await configBuilder.parseToStructured(hydratedConfig, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
 
             let runs: Run[] = [];
 

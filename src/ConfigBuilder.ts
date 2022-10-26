@@ -78,6 +78,7 @@ import {
     PollOn
 } from "./Common/Infrastructure/Atomic";
 import {
+    asFilterOptionsJson,
     FilterCriteriaDefaults,
     FilterCriteriaDefaultsJson,
     MaybeAnonymousOrStringCriteria, MinimalOrFullFilter, MinimalOrFullFilterJson, NamedCriteria
@@ -385,7 +386,7 @@ export class ConfigBuilder {
         return await this.hydrateConfig(config, resource);
     }
 
-    async parseToStructured(hydratedConfig: SubredditConfigHydratedData, resource: SubredditResources, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): Promise<RunConfigObject[]> {
+    async parseToStructured(hydratedConfig: SubredditConfigHydratedData, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): Promise<RunConfigObject[]> {
         let namedRules: Map<string, RuleConfigObject> = new Map();
         let namedActions: Map<string, ActionConfigObject> = new Map();
         const {filterCriteriaDefaults, postCheckBehaviorDefaults} = hydratedConfig;
@@ -548,7 +549,7 @@ const parseFilterJson = <T>(addToFilter: FilterJsonFuncArg<T>) => (val: MinimalO
         for (const v of val) {
             addToFilter(v);
         }
-    } else {
+    } else if(asFilterOptionsJson<T>(val)) {
         const {include = [], exclude = []} = val;
         for (const v of include) {
             addToFilter(v);
@@ -565,46 +566,6 @@ export const extractNamedFilters = (config: SubredditConfigHydratedData, namedAu
 
     const parseAuthorIs = parseFilterJson(addToAuthors);
     const parseItemIs = parseFilterJson(addToItems);
-
-    // const parseAuthorIs = (val: MinimalOrFullFilterJson<AuthorCriteria> | undefined) => {
-    //     if (val === undefined) {
-    //         return;
-    //     }
-    //     if (Array.isArray(val)) {
-    //         for (const v of val) {
-    //             addToAuthors(v);
-    //         }
-    //     } else {
-    //         const {include = [], exclude = []} = val;
-    //         for (const v of include) {
-    //             addToAuthors(v);
-    //         }
-    //         for (const v of exclude) {
-    //             addToAuthors(v);
-    //         }
-    //     }
-    // }
-
-    // const parseItemIs = (val: MinimalOrFullFilterJson<TypedActivityState> | undefined) => {
-    //     if (val === undefined) {
-    //         return;
-    //     }
-    //     if (Array.isArray(val)) {
-    //         for (const v of val) {
-    //             addToItems(v);
-    //         }
-    //     } else {
-    //         const {include = [], exclude = []} = val;
-    //         for (const v of include) {
-    //             addToItems(v);
-    //         }
-    //         for (const v of exclude) {
-    //             addToItems(v);
-    //         }
-    //     }
-    // }
-
-    //const namedRules = new Map();
 
     const {
         filterCriteriaDefaults,
@@ -681,34 +642,36 @@ export const insertNameFilters = (namedAuthorFilters: Map<string, NamedCriteria<
         authorIs: undefined,
         itemIs: undefined,
     }
-    if(val.authorIs !== undefined) {
+    if (val.authorIs !== undefined) {
         if (Array.isArray(val.authorIs)) {
             runnableOpts.authorIs = val.authorIs.map(x => getNamedAuthorOrReturn(x))
-        } else {
-            runnableOpts.authorIs = {};
-
-            const {include, exclude} = val.authorIs;
-            if(include !== undefined) {
+        } else if (asFilterOptionsJson<AuthorCriteria>(val.authorIs)) {
+            const {include, exclude, ...rest} = val.authorIs;
+            runnableOpts.authorIs = {...rest};
+            if (include !== undefined) {
                 runnableOpts.authorIs.include = include.map(x => getNamedAuthorOrReturn(x))
-            }
-            if(exclude !== undefined) {
+            } else if (exclude !== undefined) {
                 runnableOpts.authorIs.exclude = exclude.map(x => getNamedAuthorOrReturn(x))
             }
+        } else {
+            // assume object is criteria
+            runnableOpts.authorIs = [getNamedAuthorOrReturn(val.authorIs)];
         }
     }
-    if(val.itemIs !== undefined) {
+    if (val.itemIs !== undefined) {
         if (Array.isArray(val.itemIs)) {
             runnableOpts.itemIs = val.itemIs.map(x => getNamedItemOrReturn(x))
-        } else {
-            runnableOpts.itemIs = {};
-
-            const {include, exclude} = val.itemIs;
-            if(include !== undefined) {
+        } else if (asFilterOptionsJson<TypedActivityState>(val.itemIs)) {
+            const {include, exclude, ...rest} = val.itemIs;
+            runnableOpts.itemIs = {...rest};
+            if (include !== undefined) {
                 runnableOpts.itemIs.include = include.map(x => getNamedItemOrReturn(x))
-            }
-            if(exclude !== undefined) {
+            } else if (exclude !== undefined) {
                 runnableOpts.itemIs.exclude = exclude.map(x => getNamedItemOrReturn(x))
             }
+        } else {
+            // assume object is criteria
+            runnableOpts.itemIs = [getNamedItemOrReturn(val.itemIs)];
         }
     }
 
