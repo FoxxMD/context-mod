@@ -1,10 +1,14 @@
 import Snoowrap, {Listing, RedditUser} from "snoowrap";
 import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
-import {parseSubredditName} from "../util";
+import {asSubmission, parseSubredditName} from "../util";
 import {ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
 import {CreateModNoteData, ModNote, ModNoteRaw, ModNoteSnoowrapPopulated} from "../Subreddit/ModNotes/ModNote";
 import {CMError, isStatusError, SimpleError} from "./Errors";
-import {RawSubredditRemovalReasonData, SnoowrapActivity} from "../Common/Infrastructure/Reddit";
+import {
+    RawSubredditRemovalReasonData, RedditRemovalMessageOptions,
+    RedditRemovalMessageType,
+    SnoowrapActivity
+} from "../Common/Infrastructure/Reddit";
 
 // const proxyFactory = (endpoint: string) => {
 //     return class ProxiedSnoowrap extends Snoowrap {
@@ -203,6 +207,36 @@ export class ExtendedSnoowrap extends Snoowrap {
             uri: `api/v1/${typeof sub === 'string' ? sub : sub.display_name}/removal_reasons`,
             method: 'get'
         }) as RawSubredditRemovalReasonData;
+    }
+
+    // @ts-ignore
+    async addRemovalMessage(item: SnoowrapActivity, message: string, type: RedditRemovalMessageType, options: RedditRemovalMessageOptions = {}) {
+        const {
+            lock = false,
+            // in the body, title must be a non-empty string or else reddit throws an error
+            // -- it is only used if sending modmail
+            title = 'NOT USED'
+        } = options;
+        try {
+            const body: any = {
+                item_id: [item.name],
+                message,
+                type,
+                lock_comment: lock,
+                title,
+            };
+            const reply = await this.oauthRequest({
+                uri: `api/v1/modactions/${asSubmission(item) ? 'removal_link_message' : 'removal_comment_message'}`,
+                method: 'post',
+                body,
+            });
+            return new Comment(reply, this, true);
+        } catch (e: any) {
+            if (e.message.includes('The specified id is invalid')) {
+                throw new CMError('Activity must be REMOVED before a message can be sent.', {cause: e});
+            }
+            throw e;
+        }
     }
 }
 

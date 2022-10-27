@@ -537,6 +537,25 @@ actions:
     targets: string # 'self' or 'parent' or 'https://reddit.com/r/someSubreddit/21nfdi....'
 ```
 
+### Comment As Subreddit
+
+ContextMod can comment [as the subreddit](https://www.reddit.com/r/modnews/comments/wpy5c8/announcing_remove_as_a_subreddit/) using the `/u/subreddit-ModTeam` account with some restrictions:
+
+* The activity being replied to must ALREADY BE REMOVED.
+  * You can use the [Remove Action](#remove) beforehand to ensure this is the case.
+* The created comment will always be stickied and distinguished
+
+Usage:
+
+```yaml
+actions:
+  - kind: comment
+    asModTeam: true
+    content: string # required, the content of the comment
+    lock: boolean # lock the comment after creation
+    targets: string # 'self' or 'parent' or 'https://reddit.com/r/someSubreddit/21nfdi....'
+```
+
 ### Submission
 
 Create a Submission [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FSubmissionActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)

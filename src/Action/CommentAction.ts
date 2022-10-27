@@ -1,9 +1,15 @@
 import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {renderContent} from "../Utils/SnoowrapUtils";
+import {activityIsRemoved, renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent, RuleResult} from "../Common/interfaces";
-import {asComment, asSubmission, parseRedditThingsFromLink, truncateStringToLength} from "../util";
+import {
+    asComment,
+    asSubmission,
+    getActivitySubredditName,
+    parseRedditThingsFromLink,
+    truncateStringToLength
+} from "../util";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTarget, ActionTypes, ArbitraryActionTarget} from "../Common/Infrastructure/Atomic";
@@ -18,6 +24,7 @@ export class CommentAction extends Action {
     distinguish: boolean = false;
     footer?: false | string;
     targets: ArbitraryActionTarget[]
+    asModTeam: boolean;
 
     constructor(options: CommentActionOptions) {
         super(options);
@@ -27,12 +34,14 @@ export class CommentAction extends Action {
             sticky = false,
             distinguish = false,
             footer,
-            targets = ['self']
+            targets = ['self'],
+            asModTeam = false,
         } = options;
         this.footer = footer;
         this.content = content;
         this.lock = lock;
         this.sticky = sticky;
+        this.asModTeam = asModTeam;
         this.distinguish = distinguish;
         if (!Array.isArray(targets)) {
             this.targets = [targets];
@@ -104,17 +113,48 @@ export class CommentAction extends Action {
                 continue;
             }
 
+            if(this.asModTeam) {
+                if(!targetItem.can_mod_post) {
+                    const noMod = `[${targetIdentifier}] Cannot comment as subreddit because bot is not a moderator`;
+                    this.logger.warn(noMod);
+                    targetResults.push(noMod);
+                    continue;
+                }
+                if(getActivitySubredditName(targetItem) !== this.resources.subreddit.display_name) {
+                    const wrongSubreddit = `[${targetIdentifier}] Will not comment as subreddit because Activity did not occur in the same subreddit as the bot is moderating`;
+                    this.logger.warn(wrongSubreddit);
+                    targetResults.push(wrongSubreddit);
+                    continue;
+                }
+                if(!activityIsRemoved(targetItem)) {
+                    const notRemoved = `[${targetIdentifier}] Cannot comment as subreddit because Activity IS NOT REMOVED.`
+                    this.logger.warn(notRemoved);
+                    targetResults.push(notRemoved);
+                    continue;
+                }
+            }
+
             let modifiers = [];
             let reply: Comment;
             if (!dryRun) {
-                // @ts-ignore
-                reply = await targetItem.reply(renderedContent);
+                if(this.asModTeam) {
+                    try {
+                        reply = await this.client.addRemovalMessage(targetItem, renderedContent, 'public_as_subreddit',{lock: this.lock});
+                    } catch (e: any) {
+                        this.logger.warn(new CMError('Could not comment as subreddit', {cause: e}));
+                        targetResults.push(`Could not comment as subreddit: ${e.message}`);
+                        continue;
+                    }
+                } else {
+                    // @ts-ignore
+                    reply = await targetItem.reply(renderedContent);
+                }
                 // add to recent so we ignore activity when/if it is discovered by polling
                 await this.resources.setRecentSelf(reply);
                 touchedEntities.push(reply);
             }
 
-            if (this.lock && targetItem.can_mod_post) {
+            if (!this.asModTeam && this.lock && targetItem.can_mod_post) {
                 if (!targetItem.can_mod_post) {
                     this.logger.warn(`[${targetIdentifier}] Cannot lock because bot is not a moderator`);
                 } else {
@@ -127,7 +167,7 @@ export class CommentAction extends Action {
                 }
             }
 
-            if (this.distinguish) {
+            if (!this.asModTeam && this.distinguish) {
                 if (!targetItem.can_mod_post) {
                     this.logger.warn(`[${targetIdentifier}] Cannot lock Distinguish/Sticky because bot is not a moderator`);
                 } else {
@@ -203,6 +243,16 @@ export interface CommentActionConfig extends RequiredRichContent, Footer {
      * If target is not self/parent then CM assumes the value is a reddit permalink and will attempt to make a comment to that Activity
      * */
     targets?: ArbitraryActionTarget | ArbitraryActionTarget[]
+
+    /**
+     * Comment "as subreddit" using the "/u/subreddit-ModTeam" account
+     *
+     * RESTRICTIONS:
+     *
+     * * Target activity must ALREADY BE REMOVED
+     * * Will always distinguish and sticky the created comment
+     * */
+    asModTeam?: boolean
 }
 
 export interface CommentActionOptions extends CommentActionConfig, ActionOptions {
