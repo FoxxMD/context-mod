@@ -286,7 +286,7 @@ export class UserNote {
         const {duration} = parseGenericValueOrPercentComparison(criteria.count ?? '>= 1');
         if (duration !== undefined) {
             const cutoffDate = dayjs().subtract(duration);
-            if (this.time.isSameOrAfter(cutoffDate)) {
+            if (this.time.isBefore(cutoffDate)) {
                 return false;
             }
         }
