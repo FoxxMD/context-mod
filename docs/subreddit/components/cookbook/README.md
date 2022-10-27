@@ -188,3 +188,14 @@ Submission is removed if the author has **less than 5 non-OP comments** in your 
 * [Config](/docs/subreddit/components/cookbook/requireNonOPParticipation.yaml)
 
 After making a submission the author must make a top-level comment with a regex-checkable pattern within X minutes. If the comment is not made the submission is removed.
+
+# Monitoring
+
+### Sticky a comment on popular submissions
+
+* Type: **Run**
+* [Config](/docs/subreddit/components/cookbook/popularSubmissionMonitoring.yaml)
+
+This **Run** should come after any other Runs you have that may remove a Submission.
+
+The Run will cause CM to check new submissions for 3 hours at a 10 minute interval. The bot will then make a comment and sticky it WHEN it detects the number of upvotes is abnormal for how long the Submission has been "alive".
