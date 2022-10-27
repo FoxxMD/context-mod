@@ -3,10 +3,23 @@ import {Submission, RedditUser, Comment, Subreddit} from "snoowrap/dist/objects"
 import {ModUserNote, ModUserNoteRaw} from "./ModUserNote";
 //import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import dayjs, {Dayjs} from "dayjs";
-import {generateSnoowrapEntityFromRedditThing, parseRedditFullname} from "../../util";
+import {
+    asComment,
+    asSubmission,
+    generateSnoowrapEntityFromRedditThing,
+    isComment,
+    isSubmission,
+    parseRedditFullname
+} from "../../util";
 import Snoowrap from "snoowrap";
 import {ModActionType, ModUserNoteLabel} from "../../Common/Infrastructure/Atomic";
-import {RedditThing} from "../../Common/Infrastructure/Reddit";
+import {MaybeActivityType, RedditThing, SnoowrapActivity} from "../../Common/Infrastructure/Reddit";
+import {
+    FullModActionCriteria,
+    FullModLogCriteria,
+    FullModNoteCriteria
+} from "../../Common/Infrastructure/Filters/FilterCriteria";
+import {CMError} from "../../Utils/Errors";
 
 export interface ModNoteSnoowrapPopulated extends Omit<ModNoteRaw, 'subreddit' | 'user'> {
     subreddit: Subreddit
@@ -82,8 +95,12 @@ export class ModNote {
         }
 
         this.action = new ModAction(data.mod_action_data, client);
-        if (this.action.actedOn instanceof RedditUser && this.action.actedOn.id === this.user.id) {
-            this.action.actedOn = this.user;
+        if (this.action.actedOn instanceof RedditUser) {
+            if(this.action.actedOn.id === this.user.id) {
+                this.action.actedOn = this.user;
+            }/* else if(data.operator !== undefined) {
+                this.action.actedOn.name = data.operator;
+            }*/
         }
 
         this.note = new ModUserNote(data.user_note_data, client);
@@ -115,5 +132,113 @@ export class ModNote {
 
     toJSON() {
         return this.toRaw();
+    }
+
+    matchesModActionCriteria(fullCrit: FullModActionCriteria, referenceItem?: SnoowrapActivity) {
+        const {count: {duration} = {}, activityType, referencesCurrentActivity, type} = fullCrit;
+
+        let cutoffDate: Dayjs | undefined;
+
+        if (duration !== undefined) {
+            // filter out any notes that occur before time range
+            cutoffDate = dayjs().subtract(duration);
+            if (this.createdAt.isBefore(cutoffDate)) {
+                return false;
+            }
+        }
+
+        if (activityType !== undefined) {
+            const anyMatch = activityType.some((a: MaybeActivityType) => {
+                switch (a) {
+                    case 'submission':
+                        return isSubmission(this.action.actedOn);
+                    case 'comment':
+                        return isComment(this.action.actedOn);
+                    case false:
+                        return this.action.actedOn === undefined || (!asSubmission(this.action.actedOn) && !asComment(this.action.actedOn));
+                }
+            });
+            if (!anyMatch) {
+                return false;
+            }
+        }
+
+        if (referencesCurrentActivity !== undefined) {
+            if (referenceItem === undefined) {
+                throw new CMError('Criteria wants to check if mod note references activity but not activity was given.');
+            }
+            const isCurrentActivity = this.action.actedOn !== undefined && referenceItem !== undefined && this.action.actedOn.name === referenceItem.name;
+            if ((referencesCurrentActivity === true && !isCurrentActivity) || (referencesCurrentActivity === false && isCurrentActivity)) {
+                return false;
+            }
+        }
+
+        if (type !== undefined) {
+            if (!type.includes((this.type as ModActionType))) {
+                return false
+            }
+        }
+
+        return true;
+    }
+
+    matchesModLogCriteria(fullCrit: FullModLogCriteria, referenceItem: SnoowrapActivity) {
+        if (!this.matchesModActionCriteria({
+            type: ['NOTE'], // default to filtering by note type but allow overriding?
+            ...fullCrit
+        }, referenceItem)) {
+            return false;
+        }
+        const fullCritEntries = Object.entries(fullCrit);
+
+        for (const [k, v] of fullCritEntries) {
+            const key = k.toLocaleLowerCase();
+            switch (key) {
+                case 'description':
+                case 'action':
+                case 'details':
+                    const actionPropVal = this.action[key] as string;
+                    if (actionPropVal === undefined) {
+                        return false;
+                    }
+                    const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                    if (!anyPropMatch) {
+                        return false;
+                    }
+                    break;
+            }
+        }
+
+        return true;
+    }
+
+    matchesModNoteCriteria(fullCrit: FullModNoteCriteria, referenceItem: SnoowrapActivity) {
+        if(!this.matchesModActionCriteria(fullCrit, referenceItem)) {
+            return false;
+        }
+        const fullCritEntries = Object.entries(fullCrit);
+
+        for (const [k, v] of fullCritEntries) {
+            const key = k.toLocaleLowerCase();
+            switch (key) {
+                case 'notetype':
+                    if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((this.note.label as ModUserNoteLabel))) {
+                        return false
+                    }
+                    break;
+                case 'note':
+                    const actionPropVal = this.note.note;
+                    if (actionPropVal === undefined) {
+                        return false;
+                    }
+                    const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                    if (!anyPropMatch) {
+                        return false;
+                    }
+                    break;
+            }
+        }
+
+        return true;
     }
 }

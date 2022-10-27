@@ -872,148 +872,26 @@ export class SubredditResources {
     }
 
     filterAuthorModActions(modActions: ModNote[], actionCriteria: (ModNoteCriteria | ModLogCriteria), referenceItem: SnoowrapActivity) {
-        const {search = 'current', count = '>= 1'} = actionCriteria;
-
-        const {
-            value,
-            operator,
-            isPercent,
-            duration,
-            extra = ''
-        } = parseGenericValueOrPercentComparison(count);
-
-        const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
+        const {search = 'current'} = actionCriteria;
 
         let actionsToUse: ModNote[] = [];
-        if(asModNoteCriteria(actionCriteria)) {
+        if (asModNoteCriteria(actionCriteria)) {
             actionsToUse = modActions.filter(x => x.type === 'NOTE');
         } else {
             actionsToUse = modActions;
         }
 
-        if(search === 'current' && actionsToUse.length > 0) {
+        if (search === 'current' && actionsToUse.length > 0) {
             actionsToUse = [actionsToUse[0]];
         }
 
         let validActions: ModNote[] = [];
         if (asModLogCriteria(actionCriteria)) {
             const fullCrit = toFullModLogCriteria(actionCriteria);
-            const fullCritEntries = Object.entries(fullCrit);
-            validActions = actionsToUse.filter(x => {
-
-                // filter out any notes that occur before time range
-                if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
-                    return false;
-                }
-
-                for (const [k, v] of fullCritEntries) {
-                    const key = k.toLocaleLowerCase();
-                    if (['count', 'search'].includes(key)) {
-                        continue;
-                    }
-                    switch (key) {
-                        case 'type':
-                            if (!v.includes((x.type as ModActionType))) {
-                                return false
-                            }
-                            break;
-                        case 'activitytype':
-                            const anyMatch = v.some((a: MaybeActivityType) => {
-                                switch (a) {
-                                    case 'submission':
-                                        return isSubmission(x.action.actedOn);
-                                    case 'comment':
-                                        return isComment(x.action.actedOn);
-                                    case false:
-                                        return x.action.actedOn === undefined || (!asSubmission(x.action.actedOn) && !asComment(x.action.actedOn));
-                                }
-                            });
-                            if (!anyMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'description':
-                        case 'action':
-                        case 'details':
-                            const actionPropVal = x.action[key] as string;
-                            if (actionPropVal === undefined) {
-                                return false;
-                            }
-                            const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
-                            if (!anyPropMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'referencescurrentactivity':
-                            const isCurrentActivity = x.action.actedOn !== undefined && referenceItem !== undefined && x.action.actedOn.name === referenceItem.name;
-                            if((v === true && !isCurrentActivity) || (v === false && isCurrentActivity)) {
-                                return false;
-                            }
-                            break;
-                    } // case end
-
-                } // for each end
-
-                return true;
-            }); // filter end
-        } else if(asModNoteCriteria(actionCriteria)) {
+            validActions = actionsToUse.filter(x => x.matchesModLogCriteria(fullCrit, referenceItem));
+        } else if (asModNoteCriteria(actionCriteria)) {
             const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
-            const fullCritEntries = Object.entries(fullCrit);
-            validActions = actionsToUse.filter(x => {
-
-                // filter out any notes that occur before time range
-                if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
-                    return false;
-                }
-
-                for (const [k, v] of fullCritEntries) {
-                    const key = k.toLocaleLowerCase();
-                    if (['count', 'search'].includes(key)) {
-                        continue;
-                    }
-                    switch (key) {
-                        case 'notetype':
-                            if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
-                                return false
-                            }
-                            break;
-                        case 'note':
-                            const actionPropVal = x.note.note;
-                            if (actionPropVal === undefined) {
-                                return false;
-                            }
-                            const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
-                            if (!anyPropMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'activitytype':
-                            const anyMatch = v.some((a: MaybeActivityType) => {
-                                switch (a) {
-                                    case 'submission':
-                                        return isSubmission(x.action.actedOn);
-                                    case 'comment':
-                                        return isComment(x.action.actedOn);
-                                    case false:
-                                        return x.action.actedOn === undefined || (!asSubmission(x.action.actedOn) && !asComment(x.action.actedOn));
-                                }
-                            });
-                            if (!anyMatch) {
-                                return false;
-                            }
-                            break;
-                        case 'referencescurrentactivity':
-                            const isCurrentActivity = x.action.actedOn !== undefined && referenceItem !== undefined && x.action.actedOn.id === referenceItem.name;
-                            if((v === true && !isCurrentActivity) || (v === false && isCurrentActivity)) {
-                                return false;
-                            }
-                            break;
-                    } // case end
-
-                } // for each end
-
-                return true;
-            }); // filter end
+            validActions = actionsToUse.filter(x => x.matchesModNoteCriteria(fullCrit, referenceItem));
         } else {
             throw new SimpleError(`Could not determine if a modActions criteria was for Mod Log or Mod Note. Given: ${JSON.stringify(actionCriteria)}`);
         }
