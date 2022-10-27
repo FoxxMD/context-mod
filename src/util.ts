@@ -2826,9 +2826,9 @@ export const parseRedditFullname = (str: string): RedditThing | undefined => {
 export const generateSnoowrapEntityFromRedditThing = (data: RedditThing, client: Snoowrap) => {
     switch(data.type) {
         case 'comment':
-            return new Comment({id: data.val}, client, false);
+            return new Comment({name: data.val, id: data.id}, client, false);
         case 'submission':
-            return new Submission({id: data.val}, client, false);
+            return new Submission({name: data.val, id: data.id}, client, false);
         case 'user':
             return new RedditUser({id: data.val}, client, false);
         case 'subreddit':
