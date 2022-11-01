@@ -38,6 +38,7 @@ import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructu
 import {DurationVal, GenericContentTemplateData} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
 import {
+    ListingMore,
     SnoowrapActivity,
     SubredditActivityAbsoluteBreakdown,
     SubredditActivityBreakdown, SubredditActivityBreakdownByType
@@ -565,4 +566,24 @@ export const formatSubredditBreakdownAsMarkdownList = (data: SubredditActivityBr
     }).join('\n');
 
     return `${bd}\n`;
+}
+
+export const getListingMoreObj = <T>(list: Listing<T>): ListingMore | undefined => {
+    // @ts-ignore
+    if(list._more === null) {
+        return undefined;
+    }
+    // @ts-ignore
+    return (list._more as ListingMore);
+}
+
+export const getNumberOfReplies = (activity: SnoowrapActivity): number => {
+    if(asSubmission(activity)) {
+        return activity.num_comments;
+    }
+    const more = getListingMoreObj(activity.replies);
+    if(more === undefined) {
+        return activity.replies.length;
+    }
+    return activity.replies.length + more.children.length;
 }
