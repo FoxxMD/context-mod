@@ -44,7 +44,7 @@ Feature highlights for **Developers and Hosting (Operators):**
 * [Database Persistence](/docs/operator/database.md) using SQLite, MySql, or Postgres
   * Audit trails for bot activity
   * Historical statistics
-* [Docker container support](/docs/operator/installation.md#docker-recommended)
+* [Docker container](/docs/operator/installation.md#docker-recommended) and [docker-compose](/docs/operator/installation.md#docker-compose) support
 * Easy, UI-based [OAuth authentication](/docs/operator/addingBot.md) for adding Bots and moderator dashboard
 * Integration with [InfluxDB](https://www.influxdata.com) for detailed [time-series metrics](/docs/operator/database.md#influx) and a pre-built [Grafana](https://grafana.com) [dashboard](/docs/operator/database.md#grafana)
 
