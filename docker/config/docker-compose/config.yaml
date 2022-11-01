@@ -1,6 +1,5 @@
 operator:
-  name: #YOUR REDDIT USERNAME HERE
-  botName: ContextModMain
+  name: CHANGE_THIS #YOUR REDDIT USERNAME HERE
 logging:
   # default level for all transports
   level: debug
@@ -24,6 +23,7 @@ databaseConfig:
     type: 'mariadb'
     host: 'database'
     username: 'cmuser'
+    # This should match the password set in docker-compose.yaml
     password: 'CHANGE_THIS'
     database: 'ContextMod'
 web:
@@ -32,9 +32,12 @@ web:
   session:
     storage: cache
   port: 8085
-influxConfig:
-  credentials:
-    url: 'http://influx:8086'
-    token: 'YourInfluxToken'
-    org: YourInfluxOrg
-    bucket: contextmod
+#
+# Influx/Grafana requires additional configuration. See https://github.com/FoxxMD/context-mod/blob/master/docs/operator/database.md#influx
+#
+#influxConfig:
+#  credentials:
+#    url: 'http://influx:8086'
+#    token: 'YourInfluxToken'
+#    org: YourInfluxOrg
+#    bucket: contextmod

@@ -2,12 +2,25 @@ version: '3.7'
 
 services:
   app:
-    build:
-      context: .
+    image: foxxmd/context-mod:latest
+    # use the settings below, instead of 'image', if running context-mod from the repository (developing local changes)
+#    build:
+#      context: .
     volumes:
-      - './cmAppData/config:/config'
+      # Location of config file to use with CM
+      # The path BEFORE the colon (:) is the path on the host machine
+      # which defaults to a folder named 'data' in the same directory this file is run in.
+      - './data:/config'
+      # For a new installation you should use the config from the repository included for use with docker-compose
+      # https://github.com/FoxxMD/context-mod/blob/master/docker/config/docker-compose/config.yaml
+      # Copy config.yaml to /(this directory)/data/config.yaml and then modify to match any changed settings below (see comments on config.yaml)
     ports:
       - "${CM_WEB-8085}:8085"
+    environment:
+      IS_DOCKER: true
+      # If using a linux host, uncomment these and set them accordingly https://github.com/FoxxMD/context-mod/blob/master/docs/operator/installation.md#linux-host
+#      PUID: 1000
+#      PGID: 1000
 
   cache:
     image: 'redis:7-alpine'
@@ -17,15 +30,16 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: CHANGE_THIS
       MYSQL_USER: cmuser
+      # this should match the password set in config.yaml
       MYSQL_PASSWORD: CHANGE_THIS
       MYSQL_DATABASE: ContextMod
     volumes:
-      - './cmAppData/db:/var/lib/mysql'
+      - './data/db:/var/lib/mysql'
 
   influx:
     image: 'influxdb:latest'
     volumes:
-      - './cmAppData/influx:/var/lib/influxdb2'
+      - './data/influx:/var/lib/influxdb2'
     ports:
       - "${INFLUX_WEB:-8086}:8086"
     profiles:
@@ -34,7 +48,7 @@ services:
   grafana:
     image: 'grafana/grafana'
     volumes:
-      - './cmAppData/grafana:/var/lib/grafana'
+      - './data/grafana:/var/lib/grafana'
     ports:
       - "${GRAFANA_WEB:-3000}:3000"
     environment:
