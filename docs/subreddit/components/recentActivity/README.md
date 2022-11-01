@@ -29,3 +29,17 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRecentActi
 
 * Free Karma Subreddits [YAML](/docs/subreddit/components/recentActivity/freeKarma.yaml) | [JSON](/docs/subreddit/components/recentActivity/freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
 * Submission in Free Karma Subreddits [YAML](/docs/subreddit/components/recentActivity/freeKarmaOnSubmission.yaml) | [JSON](/docs/subreddit/components/recentActivity/freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
+
+# [Template Variables](/docs/subreddit/actionTemplating.md)
+
+|         Name         |                        Description                         |                                                                   Example                                                                    |
+|----------------------|------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `result`             | Summary of rule results (also found in Actioned Events)    | 9 activities found in 2 of the specified subreddits (out of 21 total) MET threshold of >= 1 activities -- subreddits: SubredditA, SubredditB |
+| `window`             | Number or duration of Activities considered from window    | 100 activities                                                                                                                               |
+| `subSummary`         | Comma-delimited list of subreddits matched by the criteria | SubredditA, SubredditB                                                                                                                       |
+| `subCount`           | Number of subreddits that match the criteria               | 2                                                                                                                                            |
+| `totalCount`         | Total number of activities found by criteria               | 9                                                                                                                                            |
+| `threshold`          | The threshold used to trigger the rule                     | `>= 1`                                                                                                                                       |
+| `karmaThreshold`     | If present, the karma threshold used to trigger the rule   | `> 5`                                                                                                                                        |
+| `combinedKarma`      | Total number of karma gained from the matched activities   | 10                                                                                                                                           |
+| `subredditBreakdown` | A markdown list of filtered activities by subreddit        | * SubredditA - 5 (71%) \n * Subreddit B - 2 (28%)                                                                                            |

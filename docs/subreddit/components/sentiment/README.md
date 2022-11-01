@@ -181,3 +181,16 @@ rules:
 actions:
   - kind: remove
 ```
+
+# [Template Variables](/docs/subreddit/actionTemplating.md)
+
+|           Name            |                                           Description                                            |                                Example                                |
+|---------------------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| `result`                  | Summary of rule results (also found in Actioned Events)                                          | Current Activity Sentiment -0.35 (-0.45) PASSED sentiment test < -0.3 |
+| `triggered`               | Boolean if rule was triggered or not                                                             | true                                                                  |
+| `sentimentTest`           | The sentiment value test                                                                         | `< -0.3`                                                              |
+| `historicalSentimentTest` | The sentiment value test used for historical activities                                          | `< -0.3`                                                              |
+| `averageScore`            | The averaged score (equal weights) for all sentiment analysis tests run on the current activity  | -0.35                                                                 |
+| `averageWindowScore`      | The averaged score (equal weights) for all sentiment analysis tests run on historical activities | -0.35                                                                 |
+| `window`                  | Number or duration of Activities considered from window                                          | 100 activities                                                        |
+| `totalMatching`           | Number of activities that passed the sentimentTest                                               | 1                                                                     |

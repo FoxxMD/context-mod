@@ -267,6 +267,15 @@ When the rule is run in a **Comment Check** you may specify text comparisons (li
 * **minWordCount** -- The minimum number of words a comment must have
 * **caseSensitive** -- If the match comparison should be case-sensitive (defaults to `false`)
 
+# [Template Variables](/docs/subreddit/actionTemplating.md)
+
+
+|       Name        |                               Description                                |                                                                                                                   Example                                                                                                                   |
+|-------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `result`          | Summary of rule results (also found in Actioned Events)                  | Searched top 0 comments in top 10 most popular submissions, 50 Youtube comments and found 2 reposts. --- Closest Match => >> The thought of this is terrifying << from Youtube (https://youtube.com/watch?v=example) with 100.00% sameness. |
+| `closestSummary`  | If rule was triggered, the reposted activity type and where it came from | matched a comment from youtube                                                                                                                                                                                                              |
+| `closestSameness` | If rule was triggered, the sameness of repost to the current activity    | 100%                                                                                                                                                                                                                                        |
+
 # Examples
 
 Examples of a *full* CM configuration, including the Repost Rule, in various scenarios. In each scenario the parts of the configuration that affect the rule are indicated.

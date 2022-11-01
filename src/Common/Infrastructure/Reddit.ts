@@ -1,4 +1,6 @@
-import {Comment, Submission} from "snoowrap/dist/objects";
+import {Comment, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
+import { ValueOf } from "ts-essentials";
+import {CMError} from "../../Utils/Errors";
 
 export type ActivityType = 'submission' | 'comment';
 export type MaybeActivityType = ActivityType | false;
@@ -21,8 +23,22 @@ export type AuthorHistorySortTime = 'hour' | 'day' | 'week' | 'month' | 'year' |
 export type AuthorHistoryType = 'comment' | 'submission' | 'overview';
 export type SnoowrapActivity = Submission | Comment;
 
+type valueof<T> = T[keyof T]
+
+/*
+* Depending on what caching provider is used the results from cache can either be
+*
+* * full-fat SnoowrapActivities (memory provider keeps everything in memory!)
+* * OR json-serialized objects of the data from those activities (all other cache providers)
+*
+* we don't know which they are until we retrieve them.
+* */
+export type SnoowrapLike = Record<keyof SnoowrapActivity, valueof<SnoowrapActivity>>;
+export type RedditUserLike = Record<keyof RedditUser, valueof<RedditUser>>;
+export type SubredditLike = Record<keyof Subreddit, valueof<Subreddit>>;
+
 export interface CachedFetchedActivitiesResult {
-    pre: SnoowrapActivity[]
+    pre: SnoowrapActivity[] | SnoowrapLike[]
     rawCount: number
     apiCount: number
     preMaxTrigger?: string | null
@@ -30,6 +46,7 @@ export interface CachedFetchedActivitiesResult {
 
 export interface FetchedActivitiesResult extends CachedFetchedActivitiesResult {
     post: SnoowrapActivity[]
+    pre: SnoowrapActivity[]
 }
 
 export type ReportType = 'mod' | 'user';
@@ -103,4 +120,49 @@ export interface SubredditActivityBreakdownByType {
     total: SubredditActivityBreakdown[]
     submission: SubredditActivityBreakdown[]
     comment: SubredditActivityBreakdown[]
+}
+
+/**
+ * * `comment` -> reply to activity with comment as with bot account
+ * * `commentModTeam` -> reply to activity with comment "as subreddit" (modteam account)
+ * * `modmail` -> send a modmail as the bot account
+ * * `modmailSubreddit` -> send a modmial as the subrddit
+ * */
+export type CMRemovalMessageType = 'comment' | 'commentModTeam' | 'modmailSubreddit' | 'modmail';
+export const cmRemovalMessageType = ['comment', 'commentModTeam', 'modmailSubreddit', 'modmail'];
+
+export const toCmRemovalMessageType = (val: string): CMRemovalMessageType => {
+    switch(val.toLowerCase()){
+        case 'comment':
+            return 'comment';
+        case 'modmail':
+            return 'modmail';
+        case 'commentmodteam':
+            return 'commentModTeam';
+        case 'modmailsubreddit':
+            return 'modmailSubreddit';
+        default:
+            throw new CMError(`Removal Message Type '${val}' was not recognized. Valid types: ${cmRemovalMessageType.join(', ')}`);
+    }
+}
+
+export type RedditRemovalMessageType = 'public' | 'private' | 'private_exposed' | 'public_as_subreddit';
+export const redditRemoveMessageTypes = ['public', 'private', 'private_exposed', 'public_as_subreddit'];
+
+export const cmToRedditRemovalReason = (cmType: CMRemovalMessageType): RedditRemovalMessageType => {
+    switch (cmType) {
+        case 'comment':
+            return 'public';
+        case 'commentModTeam':
+            return 'public_as_subreddit';
+        case 'modmail':
+            return 'private_exposed';
+        case 'modmailSubreddit':
+            return 'private';
+    }
+}
+
+export interface RedditRemovalMessageOptions {
+    title?: string
+    lock?: boolean
 }

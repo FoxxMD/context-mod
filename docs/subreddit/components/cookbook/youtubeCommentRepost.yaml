@@ -1,0 +1,47 @@
+#polling:
+#  - newComm
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+        #
+        # If submission type is a youtube video CM will check top comments on the video and remove comment if it at least 85% the same
+        # optionally, bans user if they have more than one modnote for comment reposts
+        #
+      - name: commRepostYT
+        description: Check if comment has been reposted from youtube
+        kind: comment
+        itemIs:
+          - removed: false
+            approved: false
+            op: false
+        condition: AND
+        rules:
+          - name: commRepost
+            kind: repost
+            criteria:
+              - searchOn:
+                  - external
+        actions:
+          - kind: remove
+            spam: true
+            note: 'reposted comment from youtube with {{rules.commrepostyt.closestSameness}}% sameness'
+
+          - kind: ban
+            authorIs:
+              # if the author has more than one spamwatch usernote then just ban em
+              include:
+                - modActions:
+                    - noteType: SPAM_WATCH
+                      note: "/comment repost.*/i"
+                      search: total
+                      count: "> 1"
+            message: You have been banned for repeated spammy behavior including reposting youtube comments
+            note: yt comment repost + spammy behavior
+            reason: yt comment repost + spammy behavior
+
+          - name: commRepostYTModNote
+            kind: modnote
+            content: 'YT comment repost with {{rules.commrepostyt.closestSameness}}% sameness'
+            type: SPAM_WATCH

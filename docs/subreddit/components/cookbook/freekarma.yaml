@@ -1,0 +1,45 @@
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+      #
+      # Remove submissions from users who have recent activity in freekarma subs in the last 100 activities
+      #
+      - name: freekarma removal
+        description: Remove submission if user has used freekarma sub recently
+        kind: submission
+        rules:
+          - name: freekarma
+            kind: recentActivity
+            window: 100
+            useSubmissionAsReference: false
+            thresholds:
+              - subreddits:
+                  - FreeKarma4U
+                  - FreeKarma4You
+                  - freekarmaforyou
+                  - KarmaFarming4Pros
+                  - KarmaStore
+                  - upvote
+                  - promote
+                  - shamelessplug
+                  - upvote
+                  - FreeUpVotes
+                  - GiveMeKarma
+                  - nsfwkarma
+                  - GetFreeKarmaAnyTime
+                  - freekarma2021
+                  - FreeKarma2022
+                  - KarmaRocket
+                  - FREEKARMA4PORN
+        actions:
+          - kind: report
+            enable: false
+            content: 'Remove => {{rules.freekarma.totalCount}} activities in freekarma subs'
+
+          - kind: remove
+            enable: true
+            note: '{{rules.freekarma.totalCount}} activities in freekarma subs'

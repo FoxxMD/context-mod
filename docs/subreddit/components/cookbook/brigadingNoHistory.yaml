@@ -1,0 +1,44 @@
+#polling:
+#  - newComm
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+      #
+      # Report comments from users with no history in the subreddit IF the submission is flaired as being brigaded
+      # optionally, remove comment
+      #
+      - name: Brigading No History
+        kind: comment
+        # only runs on comments in a submission with a link flair css class of 'brigaded'
+        itemIs:
+          - submissionState:
+              # can use any or all of these to detect brigaded submission
+              - link_flair_css: brigaded
+                #flairTemplate: 123-1234
+                #link_flair_text: Restricted
+        rules:
+          - name: noHistory
+            kind: recentActivity
+            # check last 100 activities that have not been removed
+            window:
+              count: 100
+              filterOn:
+                post:
+                  commentState:
+                    include:
+                      - removed: false
+            thresholds:
+              # triggers if user has only one activity (this one) in your subreddit
+              - subreddits:
+                  - MYSUBREDDIT
+                threshold: '<= 1'
+        actions:
+          - kind: report
+            enable: true
+            content: User has no history in subreddit
+
+          - kind: remove
+            enable: false
+            note: User has no history in subreddit

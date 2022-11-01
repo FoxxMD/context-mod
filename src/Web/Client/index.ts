@@ -17,7 +17,7 @@ import {
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData,
+    defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData,
     formatLogLineToHtml, filterLogs, getUserAgent,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
@@ -64,6 +64,7 @@ import {
     InviteData, SubredditInviteDataPersisted
 } from "../Common/interfaces";
 import {open} from "fs/promises";
+import {createCacheManager} from "../../Common/Cache";
 
 const emitter = new EventEmitter();
 

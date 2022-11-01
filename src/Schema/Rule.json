@@ -595,6 +595,23 @@
                         ]
                     ]
                 },
+                "flairBackgroundColor": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "The (user) flair background color (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css background color is assigned\n* If `false` then passes if NO css background is assigned\n* If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes."
+                },
                 "flairCssClass": {
                     "anyOf": [
                         {
@@ -610,7 +627,7 @@
                             ]
                         }
                     ],
-                    "description": "A (user) flair css class (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css is assigned\n* If `false` then passes if NO css is assigned",
+                    "description": "A (user) flair css class (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css is assigned\n* If `false` then passes if NO css is assigned\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.",
                     "examples": [
                         "red"
                     ]
@@ -630,7 +647,7 @@
                             ]
                         }
                     ],
-                    "description": "A (user) flair template id (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY template is assigned\n* If `false` then passed if NO template is assigned"
+                    "description": "A (user) flair template id (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY template is assigned\n* If `false` then passed if NO template is assigned\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes."
                 },
                 "flairText": {
                     "anyOf": [
@@ -647,7 +664,7 @@
                             ]
                         }
                     ],
-                    "description": "A (user) flair text value (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY text is assigned\n* If `false` then passes if NO text is assigned",
+                    "description": "A (user) flair text value (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY text is assigned\n* If `false` then passes if NO text is assigned\n* If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.",
                     "examples": [
                         "Approved"
                     ]

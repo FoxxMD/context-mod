@@ -41,6 +41,10 @@ export interface FilterOptionsJson<T> {
 
 }
 
+export const asFilterOptionsJson = <T>(val: any): val is FilterOptionsJson<T> => {
+    return val !== null && typeof val === 'object' && (val.include !== undefined || val.exclude !== undefined);
+}
+
 export interface FilterOptionsConfig<T> extends FilterOptionsJson<T> {
 
     /**
@@ -66,7 +70,7 @@ export interface FilterOptions<T> extends FilterOptionsConfig<T> {
 
 export type MinimalOrFullFilter<T> = MaybeAnonymousCriteria<T>[] | FilterOptions<T>
 export type MinimalOrFullMaybeAnonymousFilter<T> = MaybeAnonymousCriteria<T>[] | FilterOptionsConfig<T>
-export type MinimalOrFullFilterJson<T> = MaybeAnonymousOrStringCriteria<T>[] | FilterOptionsJson<T>
+export type MinimalOrFullFilterJson<T> = MaybeAnonymousOrStringCriteria<T> | MaybeAnonymousOrStringCriteria<T>[] | FilterOptionsJson<T>
 export type  StructuredFilter<T> = Omit<T, 'authorIs' | 'itemIs'> & {
     itemIs?: MinimalOrFullFilter<TypedActivityState>
     authorIs?: MinimalOrFullFilter<AuthorCriteria>

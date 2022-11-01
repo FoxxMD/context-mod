@@ -1,7 +1,7 @@
 import {SessionOptions, Store} from "express-session";
 import {TypeormStore} from "connect-typeorm";
 import {InviteData} from "../Common/interfaces";
-import {buildCachePrefix, createCacheManager, mergeArr} from "../../util";
+import {buildCachePrefix, mergeArr} from "../../util";
 import {Cache} from "cache-manager";
 // @ts-ignore
 import CacheManagerStore from 'express-session-cache-manager'
@@ -11,6 +11,7 @@ import {ClientSession} from "../../Common/WebEntities/ClientSession";
 import {Logger} from "winston";
 import {WebSetting} from "../../Common/WebEntities/WebSetting";
 import {ErrorWithCause} from "pony-cause";
+import {createCacheManager} from "../../Common/Cache";
 
 export interface CacheManagerStoreOptions {
     prefix?: string

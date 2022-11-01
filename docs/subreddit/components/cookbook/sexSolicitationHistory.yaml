@@ -1,0 +1,33 @@
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+        #
+        # Remove submission if user has any "redditor for [sex]..." submissions in their history
+        # and optionally bans user
+        #
+      - name: sexSpamHistory
+        description: Detect sex spam language in recent history and ban if found (most likely a bot)
+        kind: submission
+        rules:
+          - kind: regex
+            name: redditorFor
+            criteria:
+              # matches if text has common "looking for" acronym like F4M R4A etc...
+              - regex: '/[RFM]4[a-zA-Z\s0-9]/i'
+                totalMatchThreshold: "> 1"
+                window: 100
+                testOn:
+                  - body
+                  - title
+        actions:
+          - kind: remove
+            enable: true
+            note: 'Has sex solicitation submission history: {{rules.redditorfor.matchSample}}'
+
+          - kind: modnote
+            type: ABUSE_WARNING
+            content: 'Has sex solicitation submission history: {{rules.redditorfor.matchSample}}'

@@ -1,0 +1,41 @@
+#polling:
+#  - newComm
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+        #
+        # Detect top-level comments by users from r/transcribersofreddit
+        # and approve/flair the user
+        #
+      - name: transcriber comment
+        description: approve/flair transcribed video comment
+        kind: comment
+        itemIs:
+          # top-level comments
+          depth: '< 1'
+        condition: AND
+        rules:
+          - name: transcribedVideoFormat
+            kind: regex
+            criteria:
+              - regex: '/^[\n\r\s]*\*Video Transcription\*[\n\r]+---[\S\s]+---/gim'
+          - name: transcribersActivity
+            kind: recentActivity
+            window:
+              count: 100
+              duration: 1 week
+            useSubmissionAsReference: false
+            thresholds:
+              - subreddits:
+                  - transcribersofreddit
+        actions:
+          - kind: approve
+          - name: flairTranscriber
+            kind: flair
+            authorIs:
+              exclude:
+                - flairText:
+                    - Transcriber ✍️
+            text: Transcriber ✍️

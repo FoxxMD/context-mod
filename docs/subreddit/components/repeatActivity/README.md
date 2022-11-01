@@ -49,3 +49,14 @@ With only `gapAllowance: 2` this rule **would trigger** because the the 1 and 2 
 
 * Crosspost Spamming [JSON](/docs/subreddit/components/repeatActivity/crosspostSpamming.json5) | [YAML](/docs/subreddit/components/repeatActivity/crosspostSpamming.yaml) - Check if an Author is spamming their Submissions across multiple subreddits
 * Burst-posting [JSON](/docs/subreddit/components/repeatActivity/burstPosting.json5) | [YAML](/docs/subreddit/components/repeatActivity/burstPosting.yaml) - Check if Author is crossposting their Submissions in short bursts
+
+# [Template Variables](/docs/subreddit/actionTemplating.md)
+
+|         Name          |                       Description                       |                           Example                           |
+|-----------------------|---------------------------------------------------------|-------------------------------------------------------------|
+| `result`              | Summary of rule results (also found in Actioned Events) | 1 of 1 unique items repeated >= 7 times, largest repeat: 22 |
+| `window`              | Number or duration of Activities considered from window | 100 activities                                              |
+| `threshold`           | Number of repeats that trigger rule                     | `>= 7`                                                      |
+| `totalTriggeringSets` | Number of sets of repeats that matched threshold        | 1                                                           |
+| `largestRepeat`       | The largest number of repeats in a single set           | 22                                                          |
+| `gapAllowance`        | Number of non-repeat activities allowed between repeats | 2                                                           |

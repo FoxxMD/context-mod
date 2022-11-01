@@ -1,0 +1,71 @@
+#polling:
+#  - newSub
+#  - newComm
+#runs:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a series of RUNS
+  - name: approvals
+    checks:
+        - name: approveSubmissionOnComment
+          description: Approve an unapproved submission when OP comments with the magic words
+          kind: comment
+          itemIs:
+             # only check comment if submission is not approved and this comment is by OP
+            - submissionState:
+                - approved: false
+              op: true
+          rules:
+            - name: OPMagic
+              kind: regex
+              criteria:
+                # YOU NEED TO EDIT THIS REGEX TO MATCH THE PATTERN THE OP'S COMMENT SHOULD HAVE IN ORDER TO VERIFY THE SUBMISSION
+                - regex: '/Say Please/i'
+          actions:
+            - kind: approve
+              targets:
+                - parent
+                - self
+              # cancel any delayed dispatched actions
+            - kind: cancelDispatch
+              # tell action to look for delayed items matched parent (submission)
+              target: parent
+              # submission must have 'subVerification' identifier
+              identifier: subVerification
+
+  - name: verification
+    checks:
+      - name: waitForVerification
+        description: Delay processing this submission for 15 minutes
+        kind: submission
+        itemIs:
+          # only dispatch if this is the first time we are seeing this submission
+          - source:
+              - "poll:newSub"
+              - user
+        actions:
+          - kind: dispatch
+            target: self
+            # unique identifier which is a nice hint in the UI and also allows targeting this item while it is delayed
+            identifier: subVerification
+            delay: "15 minutes"
+            # when it is reprocessed go directly to the 'verification' run, skipping everything else
+            goto: verification
+
+      - name: removeNoVerification
+        description: Remove submission if it is not verified after delay
+        kind: submission
+        itemIs:
+          # only process this submission if it comes dispatch with 'subVerification' identifier and is NOT approved after 15 minutes
+          - source: "dispatch:subVerification"
+            approved: false
+        actions:
+          # if this submission is being processed it has been 5 minutes and was not cancelled by OF comment
+          - kind: remove
+            enable: true
+
+          - kind: comment
+            enable: true
+            lock: true
+            distinguish: true
+            content: 'Your submission has been removed because you did not follow verification instructions within 15 minutes of posting.'

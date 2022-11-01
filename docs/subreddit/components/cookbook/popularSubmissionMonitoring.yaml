@@ -1,0 +1,89 @@
+polling:
+  - newSub
+
+runs:
+  - name: MyRegularRun
+    itemIs:
+      # regular run/checks should only run on new activities or if from dashboard
+      - source:
+          - 'poll:newSub'
+          - 'poll:newComm'
+          - 'user'
+    checks:
+      - name: RuleBreakingCheck1
+        kind: submission
+      # ...
+      #
+      # your regular checks go here
+      #
+      # assuming if a Submission makes it through all of your Checks then it is "OK"
+      # to be Approved or generally will be visible in the subreddit (valid for monitoring for r/All)
+      # -- at the end of the Run add a Dispath action
+      - name: Dispatch For Popular Monitoring
+        kind: submission
+        actions:
+          - kind: dispatch
+            identifier: 'popular'
+            # CM will wait 5 minutes before processing this submission again
+            delay: '5 minutes'
+            target: 'self'
+
+    # a separate run that only processes Submissions from dispatch:popular
+  - name: PopularWatch
+    itemIs:
+      - source: 'dispatch:popular'
+    checks:
+      # each check here looks at submission age and tests upvotes against what you think is probably r/All number of votes
+      # in descending age (oldest first)
+      # NOTE: You should change the 'age' and 'score' tests to fit the traffic volume for your subreddit!
+      - name: Two Hour Check
+        kind: submission
+        itemIs:
+          - age: '>= 2 hours'
+            score: '> 100'
+        actions:
+          - kind: comment
+            name: popularComment
+            content: 'Looks like this thread is getting a lot of attention. Greetings r/All! Please keep it civil.'
+            sticky: true
+            distinguish: true
+            lock: true
+
+      - name: One Hour Check
+        kind: submission
+        itemIs:
+          - age: '>= 1 hours'
+            score: '> 50'
+        actions:
+          - popularComment
+
+      - name: Thirty Minute Check
+        kind: submission
+        itemIs:
+          - age: '>= 30 minutes'
+            score: '> 25'
+        actions:
+          - popularComment
+
+      - name: Ten Minute Check
+        kind: submission
+        itemIs:
+          - age: '>= 10 minutes'
+            score: '> 10'
+        actions:
+          - popularComment
+
+      # finally, if none of the popular checks passed re-dispatch submission to be checked in another 10 minutes
+      - name: Delay Popular Check
+        kind: submission
+        postTrigger:
+          # don't need to add this Actioned Events
+          recordTo: false
+        itemIs:
+          # only monitor until submission is 3 hours old
+          - age: '<= 3 hours'
+        actions:
+          - kind: dispatch
+            identifier: 'popular'
+            delay: '10 minutes'
+            target: 'self'

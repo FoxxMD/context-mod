@@ -1,14 +1,18 @@
-polling:
-  - newComm
-runs:
-  - checks:
-      # Stop users who spam the same comment many times
+#polling:
+#  - newComm
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+      #
+      # Remove comments by users who spam the same comment many times
+      #
       - name: low xp comment spam
         description: X-posted comment >=4x
         kind: comment
-        condition: AND
         rules:
-          - name: xPostLow
+          - name: xPostLowComm
             kind: repeatActivity
             # number of "non-repeat" comments allowed between "repeat comments"
             gapAllowance: 2
@@ -16,11 +20,13 @@ runs:
             threshold: '>= 4'
             # retrieve either last 50 comments or 6 months' of history, whichever is less
             window:
-              count: 50
+              count: 100
               duration: 6 months
         actions:
           - kind: report
-            enable: true
-            content: 'Remove => Posted same comment {{rules.xpostlow.largestRepeat}}x times'
+            enable: false
+            content: 'Remove => Posted same comment {{rules.xpostlowcomm.largestRepeat}}x times'
+
           - kind: remove
             enable: true
+            note: 'Posted same comment {{rules.xpostlowcomm.largestRepeat}}x times'

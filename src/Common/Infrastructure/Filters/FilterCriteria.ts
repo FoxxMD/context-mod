@@ -8,8 +8,9 @@ import {
 } from "../Atomic";
 import {ActivityType, MaybeActivityType} from "../Reddit";
 import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
-import {parseStringToRegexOrLiteralSearch} from "../../../util";
+import {parseStringToRegexOrLiteralSearch, toModNoteLabel} from "../../../util";
 import { Submission, Comment } from "snoowrap";
+import {RedditUser} from "snoowrap/dist/objects";
 
 /**
  * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
@@ -169,7 +170,7 @@ export interface ModNoteCriteria extends ModActionCriteria {
     note?: string | string[]
 }
 
-export interface FullModNoteCriteria extends FullModActionCriteria, Omit<ModNoteCriteria, 'note' | 'count' | 'type' | 'activityType'> {
+export interface FullModNoteCriteria extends FullModActionCriteria {
     noteType?: ModUserNoteLabel[]
     /**
      * The content of the Note to search For.
@@ -205,7 +206,15 @@ export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria
                 acc.count = parseGenericValueComparison(rawVal);
                 break;
             case 'activityType':
+                if(rawVal === false) {
+                    acc[k] = rawVal
+                } else {
+                    acc[k] = rawVal.toLowerCase();
+                }
+                break;
             case 'noteType':
+                    acc[k] = rawVal.map((x: string) => toModNoteLabel(x));
+                    break;
             case 'referencesCurrentActivity':
                 acc[k] = rawVal;
                 break;
@@ -233,7 +242,7 @@ export interface FullModLogCriteria extends FullModActionCriteria, Omit<ModLogCr
     description?: RegExp[]
 }
 
-const arrayableModLogProps = ['type','activityType','action','description','details', 'type'];
+const arrayableModLogProps = ['type','activityType','action','description','details'];
 
 export const asModLogCriteria = (val: any): val is ModLogCriteria => {
     return val !== null && typeof val === 'object' && !asModNoteCriteria(val) && ('action' in val || 'details' in val || 'description' in val || 'activityType' in val || 'search' in val || 'count' in val || 'type' in val);
@@ -258,9 +267,17 @@ export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria =>
                 acc.count = parseGenericValueComparison(rawVal);
                 break;
             case 'activityType':
+                if(rawVal === false) {
+                    acc[k] = rawVal
+                } else {
+                    acc[k] = rawVal.toLowerCase();
+                }
+                break;
             case 'type':
+                acc[k] = rawVal.map((x: string) => x.toUpperCase());
+                break;
             case 'referencesCurrentActivity':
-                acc[k as keyof FullModLogCriteria] = rawVal;
+                acc[k] = rawVal;
                 break;
             case 'action':
             case 'description':
@@ -298,14 +315,25 @@ export interface AuthorCriteria {
      *
      * * If `true` then passes if ANY css is assigned
      * * If `false` then passes if NO css is assigned
+     * * If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
      * @examples ["red"]
      * */
     flairCssClass?: boolean | string | string[],
+
+    /**
+     * The (user) flair background color (or list of) from the subreddit to match against
+     *
+     * * If `true` then passes if ANY css background color is assigned
+     * * If `false` then passes if NO css background is assigned
+     * * If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes.
+     * */
+    flairBackgroundColor?: boolean | string | string[],
     /**
      * A (user) flair text value (or list of) from the subreddit to match against
      *
      * * If `true` then passes if ANY text is assigned
      * * If `false` then passes if NO text is assigned
+     * * If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
      *
      * @examples ["Approved"]
      * */
@@ -316,6 +344,7 @@ export interface AuthorCriteria {
      *
      * * If `true` then passes if ANY template is assigned
      * * If `false` then passed if NO template is assigned
+     * * If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
      *
      * */
     flairTemplate?: boolean | string | string[]
@@ -622,6 +651,13 @@ export const cmToSnoowrapActivityMap: Record<string, keyof (Submission & Comment
     authorFlairBackgroundColor: 'author_flair_background_color',
     flairTemplate: 'link_flair_template_id',
     flairCssClass: 'author_flair_css_class',
+}
+
+export const cmToSnoowrapAuthorMap: Record<string, keyof (Submission & Comment)> = {
+    flairText: 'author_flair_text',
+    flairCssClass: 'author_flair_css_class',
+    flairTemplate: 'author_flair_template_id',
+    flairBackgroundColor: 'author_flair_background_color',
 }
 
 export const cmActivityProperties = ['submissionState', 'score', 'reports', 'removed', 'deleted', 'filtered', 'age', 'title'];

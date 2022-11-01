@@ -48,3 +48,21 @@ Example:
 
 * Low Comment Engagement [YAML](/docs/subreddit/components/history/lowEngagement.yaml) | [JSON](/docs/subreddit/components/history/lowEngagement.json5) - Check if Author is submitting much more than they comment.
 * OP Comment Engagement [YAML](/docs/subreddit/components/history/opOnlyEngagement.yaml) | [JSON](/docs/subreddit/components/history/opOnlyEngagement.json5) - Check if Author is mostly engaging only in their own content
+
+# [Template Variables](/docs/subreddit/actionTemplating.md)
+
+|         Name         |                              Description                               |                      Example                       |
+|----------------------|------------------------------------------------------------------------|----------------------------------------------------|
+| `result`             | Summary of rule results (also found in Actioned Events)                | Filtered Activities (7) were < 10 Items (2 months) |
+| `activityTotal`      | Total number of activities from window                                 | 50                                                 |
+| `filteredTotal`      | Total number of activities filtered from window                        | 7                                                  |
+| `filteredPercent`    | Percentage of activities filtered from window                          | 14%                                                |
+| `submissionTotal`    | Total number of filtered submissions from window                       | 4                                                  |
+| `submissionPercent`  | Percentage of filtered submissions from window                         | 8%                                                 |
+| `commentTotal`       | Total number of filtered comments from window                          | 3                                                  |
+| `commentPercent`     | Percentage of filtered comments from window                            | 6%                                                 |
+| `opTotal`            | Total number of comments as OP from filtered comments                  | 2                                                  |
+| `opPercent`          | Percentage of comments as OP from filtered comments                    | 66%                                                |
+| `thresholdSummary`   | A text summary of the first Criteria triggered with totals/percentages | Filtered Activities (7) were < 10 Items            |
+| `subredditBreakdown` | A markdown list of filtered activities by subreddit                    | * SubredditA - 5 (71%) \n * Subreddit B - 2 (28%)  |
+| `window`             | Number or duration of Activities considered from window                | 2 months                                           |

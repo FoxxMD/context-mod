@@ -151,7 +151,7 @@
         problems.append(wrapper);
     }
 
-    window.canSave = <%= canSave %>;
+    window.canSave = <%= canSave ?? false %>;
     window.isGuest = false;
 
     if (searchParams.get('subreddit') === null) {
@@ -342,6 +342,35 @@
         return new Promise((resolve, reject) => resolve(url));
     }
 
+    // https://stackoverflow.com/a/65996386
+    // if the user is accessing CM from an unsecure context
+    // -- http and NOT http://localhost
+    // then navigator.clipboard is not available and we need to fallback to execCommand
+    function copyToClipboard(textToCopy) {
+        // navigator clipboard api needs a secure context (https)
+        if (navigator.clipboard && window.isSecureContext) {
+            // navigator clipboard api method
+            return navigator.clipboard.writeText(textToCopy);
+        } else {
+            debugger;
+            // text area method
+            let textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            // make the textarea out of viewport
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            return new Promise((res, rej) => {
+                // here the magic happens
+                document.execCommand('copy') ? res() : rej();
+                textArea.remove();
+            });
+        }
+    }
+
     window.addEventListener('load', function () {
 
         var searchParams = new URLSearchParams(window.location.search);
@@ -442,7 +471,10 @@
                                             copy.insertAdjacentHTML('beforeend', `<a class="hover:bg-gray-400 no-underline rounded-md py-1 px-3 border" href="">Copy ID <span style="display:inline" class="iconify" data-icon="clarity:copy-to-clipboard-line"></span></a>`);
                                             copy.addEventListener('click', e => {
                                                 e.preventDefault();
-                                                navigator.clipboard.writeText(reason.id);
+                                                copyToClipboard(reason.id)
+                                                    .catch((e) => {
+                                                    console.log(`Could not copy ID ${reason.id} to clipboard due to an error`, e);
+                                                });
                                             });
                                             node.appendChild(copy);
                                             reasonsList.appendChild(node);

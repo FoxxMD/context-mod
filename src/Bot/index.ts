@@ -25,7 +25,6 @@ import {
 import {Manager} from "../Subreddit/Manager";
 import {ExtendedSnoowrap, ProxiedSnoowrap} from "../Utils/SnoowrapClients";
 import {CommentStream, ModQueueStream, SPoll, SubmissionStream, UnmoderatedStream} from "../Subreddit/Streams";
-import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
 import {
@@ -63,6 +62,7 @@ import {Guest, GuestEntityData} from "../Common/Entities/Guest/GuestInterfaces";
 import {guestEntitiesToAll, guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
 import {SubredditInvite} from "../Common/Entities/SubredditInvite";
 import {dayjsDTFormat} from "../Common/defaults";
+import {BotResourcesManager} from "./ResourcesManager";
 
 class Bot implements BotInstanceFunctions {
 

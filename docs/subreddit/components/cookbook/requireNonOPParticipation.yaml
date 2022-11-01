@@ -1,0 +1,51 @@
+#polling:
+#  - newSub
+#runs:
+#  - checks:
+#### Uncomment the code above to use this as a FULL subreddit config
+####
+#### Otherwise copy-paste the code below to use as a CHECK
+        #
+        # Report submissions by users with less than 5 non-OP comments in our subreddit
+        # and optionally remove the submission
+        #
+      - name: RequireEngagement
+        description: Remove submission if author has less than X non-op comments in our subreddit
+        kind: submission
+        rules:
+          - name: LittleEngagement
+            kind: recentActivity
+            lookAt: comments
+            useSubmissionAsReference: false
+            # bot will check the last 100 NON-OP comments from user's history
+            window:
+              count: 100
+              fetch: comments
+              filterOn:
+                post:
+                  commentState:
+                    - op: false
+            thresholds:
+                subreddits:
+                  - MYSUBREDDIT
+                # rule is "triggered" if there are LESS THAN 5 comments in our subreddit in the window specified (currently 100 non-op comments)
+                threshold: '< 5'
+
+        actions:
+
+          - kind: report # report the submission
+            enable: true
+            # the text of the report
+            content: 'User has <5 non-OP comments in last 100 comments'
+
+          - kind: remove # remove the submission
+            enable: false
+            note: 'User has <5 non-OP comments in last 100 comments'
+
+          - kind: comment # reply to submission with a comment
+            enable: false
+            # contents of the comment
+            content: We require users to have a minimum level of engagement (>5 comments on other people's posts) in our subreddit before making submissions. Your submission has been automatically removed.
+            sticky: true
+            distinguish: true
+            lock: true
