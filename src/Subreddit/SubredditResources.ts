@@ -162,6 +162,7 @@ import {ActivitySource} from "../Common/ActivitySource";
 import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
 import {SubredditStats} from "./Stats";
 import {CMCache} from "../Common/Cache";
+import { Activity } from '../Common/Entities/Activity';
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -404,7 +405,10 @@ export class SubredditResources {
                     }
                 },
                 relations: {
-                    manager: true
+                    manager: true,
+                    activity: {
+                        submission: true
+                    }
                 }
             });
             const now = dayjs();
@@ -412,7 +416,7 @@ export class SubredditResources {
                 const shouldDispatchAt = dAct.createdAt.add(dAct.delay.asSeconds(), 'seconds');
                 let tardyHint = '';
                 if(shouldDispatchAt.isBefore(now)) {
-                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
+                    let tardyHint = `Activity ${dAct.activity.id} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
                     if(dAct.tardyTolerant === true) {
                         tardyHint += ` but was configured as ALWAYS 'tardy tolerant' so will be dispatched immediately`;
                     } else if(dAct.tardyTolerant === false) {
@@ -439,14 +443,14 @@ export class SubredditResources {
                 try {
                     this.delayedItems.push(await dAct.toActivityDispatch(this.client))
                 } catch (e) {
-                    this.logger.warn(new ErrorWithCause(`Unable to add Activity ${dAct.activityId} from database delayed activities to in-app delayed activities queue`, {cause: e}));
+                    this.logger.warn(new ErrorWithCause(`Unable to add Activity ${dAct.activity.id} from database delayed activities to in-app delayed activities queue`, {cause: e}));
                 }
             }
         }
     }
 
     async addDelayedActivity(data: ActivityDispatch) {
-        const dEntity = await this.dispatchedActivityRepo.save(new DispatchedEntity({...data, manager: this.managerEntity}));
+        const dEntity = await this.dispatchedActivityRepo.save(new DispatchedEntity({...data, manager: this.managerEntity, activity: await Activity.fromSnoowrapActivity(data.activity, {db: this.database})}));
         data.id = dEntity.id;
         this.delayedItems.push(data);
     }

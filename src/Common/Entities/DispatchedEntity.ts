@@ -6,7 +6,7 @@ import {
     ManyToOne,
     PrimaryColumn,
     BeforeInsert,
-    AfterLoad
+    AfterLoad, JoinColumn
 } from "typeorm";
 import {
     ActivityDispatch
@@ -22,15 +22,15 @@ import Comment from "snoowrap/dist/objects/Comment";
 import {ColumnDurationTransformer} from "./Transformers";
 import { RedditUser } from "snoowrap/dist/objects";
 import {ActivitySourceTypes, DurationVal, NonDispatchActivitySourceValue, onExistingFoundBehavior} from "../Infrastructure/Atomic";
+import {Activity} from "./Activity";
 
 @Entity({name: 'DispatchedAction'})
 export class DispatchedEntity extends TimeAwareRandomBaseEntity {
 
-    @Column()
-    activityId!: string
-
-    @Column()
-    author!: string
+    //@ManyToOne(type => Activity, obj => obj.dispatched, {cascade: ['insert'], eager: true, nullable: false})
+    @ManyToOne(type => Activity, undefined, {cascade: ['insert'], eager: true, nullable: false})
+    @JoinColumn({name: 'activityId'})
+    activity!: Activity
 
     @Column({
         type: 'int',
@@ -82,11 +82,10 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
         }})
     tardyTolerant!: boolean | Duration
 
-    constructor(data?: ActivityDispatch & { manager: ManagerEntity }) {
+    constructor(data?: HydratedActivityDispatch) {
         super();
         if (data !== undefined) {
-            this.activityId = data.activity.name;
-            this.author = getActivityAuthorName(data.activity.author);
+            this.activity = data.activity;
             this.delay = data.delay;
             this.createdAt = data.queuedAt;
             this.type = data.type;
@@ -151,20 +150,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
     }
 
     async toActivityDispatch(client: ExtendedSnoowrap): Promise<ActivityDispatch> {
-        const redditThing = parseRedditFullname(this.activityId);
-        if(redditThing === undefined) {
-            throw new Error(`Could not parse reddit ID from value '${this.activityId}'`);
-        }
-        let activity: Comment | Submission;
-        if (redditThing?.type === 'comment') {
-            // @ts-ignore
-            activity = await client.getComment(redditThing.id);
-        } else {
-            // @ts-ignore
-            activity = await client.getSubmission(redditThing.id);
-        }
-        activity.author = new RedditUser({name: this.author}, client, false);
-        activity.id  = redditThing.id;
+        let activity = this.activity.toSnoowrap(client);
         return {
             id: this.id,
             queuedAt: this.createdAt,
@@ -176,8 +162,13 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             cancelIfQueued: this.cancelIfQueued,
             identifier: this.identifier,
             type: this.type,
-            author: this.author,
+            author: activity.author.name,
             dryRun: this.dryRun
         }
     }
+}
+
+export interface HydratedActivityDispatch extends Omit<ActivityDispatch, 'activity'> {
+    activity: Activity
+    manager: ManagerEntity
 }

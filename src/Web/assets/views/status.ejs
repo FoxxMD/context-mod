@@ -1297,7 +1297,7 @@
                     const durationDayjs = dayjs.duration(x.duration, 'seconds');
                     const durationDisplay = durationDayjs.humanize();
                     const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
-                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submission'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
+                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submission'}</a> by <a href="https://reddit.com/u/${x.author}">${x.author}</a>${isAll ? `, dispatched in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ,` : ''} queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
                 });
                 //let sub = resp.name;
                 if(sub === 'All') {

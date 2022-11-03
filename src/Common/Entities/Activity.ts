@@ -1,4 +1,4 @@
-import {Entity, Column, ManyToOne, PrimaryColumn, OneToMany, Index} from "typeorm";
+import {Entity, Column, ManyToOne, PrimaryColumn, OneToMany, Index, DataSource, JoinColumn} from "typeorm";
 import {AuthorEntity} from "./AuthorEntity";
 import {Subreddit} from "./Subreddit";
 import {CMEvent} from "./CMEvent";
@@ -6,6 +6,8 @@ import {asComment, getActivityAuthorName, parseRedditFullname, redditThingTypeTo
 import {activityReports, ActivityType, Report, SnoowrapActivity} from "../Infrastructure/Reddit";
 import {ActivityReport} from "./ActivityReport";
 import dayjs, {Dayjs} from "dayjs";
+import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
+import {Comment, Submission} from 'snoowrap/dist/objects';
 
 export interface ActivityEntityOptions {
     id: string
@@ -45,7 +47,7 @@ export class Activity {
     @Column({name: 'name'})
     name!: string;
 
-    @ManyToOne(type => Subreddit, sub => sub.activities, {cascade: ['insert']})
+    @ManyToOne(type => Subreddit, sub => sub.activities, {cascade: ['insert'], eager: true})
     subreddit!: Subreddit;
 
     @Column("varchar", {length: 20})
@@ -58,17 +60,18 @@ export class Activity {
     @Column("text")
     permalink!: string;
 
-    @ManyToOne(type => AuthorEntity, author => author.activities, {cascade: ['insert']})
+    @ManyToOne(type => AuthorEntity, author => author.activities, {cascade: ['insert'], eager: true})
     author!: AuthorEntity;
 
     @OneToMany(type => CMEvent, act => act.activity) // note: we will create author property in the Photo class below
     actionedEvents!: CMEvent[]
 
-    @ManyToOne(type => Activity, obj => obj.comments, {nullable: true})
+    @ManyToOne('Activity', 'comments', {nullable: true, cascade: ['insert']})
+    @JoinColumn({name: 'submission_id'})
     submission?: Activity;
 
-    @OneToMany(type => Activity, obj => obj.submission, {nullable: true})
-    comments!: Activity[];
+    @OneToMany('Activity', 'submission', {nullable: true})
+    comments?: Activity[];
 
     @OneToMany(type => ActivityReport, act => act.activity, {cascade: ['insert'], eager: true})
     reports: ActivityReport[] | undefined
@@ -151,10 +154,12 @@ export class Activity {
         return false;
     }
 
-    static fromSnoowrapActivity(subreddit: Subreddit, activity: SnoowrapActivity, lastKnownStateTimestamp?: dayjs.Dayjs | undefined) {
+    static async fromSnoowrapActivity(activity: SnoowrapActivity, options: fromSnoowrapOptions | undefined = {}) {
+
         let submission: Activity | undefined;
         let type: ActivityType = 'submission';
         let content: string;
+        const subreddit = await Subreddit.fromSnoowrap(activity.subreddit, options?.db);
         if(asComment(activity)) {
             type = 'comment';
             content = activity.body;
@@ -179,8 +184,30 @@ export class Activity {
             submission
         });
 
-        entity.syncReports(activity, lastKnownStateTimestamp);
+        entity.syncReports(activity, options.lastKnownStateTimestamp);
 
         return entity;
     }
+
+    toSnoowrap(client: ExtendedSnoowrap): SnoowrapActivity {
+        let act: SnoowrapActivity;
+        if(this.type === 'submission') {
+            act = new Submission({name: this.id, id: this.name}, client, false);
+            act.title = this.content;
+        } else {
+            act = new Comment({name: this.id, id: this.name}, client, false);
+            act.link_id = this.submission?.id as string;
+            act.body = this.content;
+        }
+        act.permalink = this.permalink;
+        act.subreddit = this.subreddit.toSnoowrap(client);
+        act.author = this.author.toSnoowrap(client);
+
+        return act;
+    }
+}
+
+export interface fromSnoowrapOptions {
+    lastKnownStateTimestamp?: dayjs.Dayjs | undefined
+    db?: DataSource
 }
