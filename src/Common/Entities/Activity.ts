@@ -63,7 +63,7 @@ export class Activity {
     @ManyToOne(type => AuthorEntity, author => author.activities, {cascade: ['insert'], eager: true})
     author!: AuthorEntity;
 
-    @OneToMany(type => CMEvent, act => act.activity) // note: we will create author property in the Photo class below
+    @OneToMany(type => CMEvent, act => act.activity)
     actionedEvents!: CMEvent[]
 
     @ManyToOne('Activity', 'comments', {nullable: true, cascade: ['insert']})
