@@ -6,7 +6,7 @@ nav_order: 2
 
 This section is for **reddit moderators**. It covers how to use a CM bot for your subreddit.
 
-If you are trying to run a ContextMod instance (the actual software) please refer to the [operator section](/docs/operator/README.md).
+If you are trying to run a ContextMod instance (the actual software) please refer to the [operator section](../operator/README.md).
 
 # Table of Contents
 
