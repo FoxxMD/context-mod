@@ -11,18 +11,18 @@ They are responsible for configuring the software at a high-level and managing a
 
 * Creating cache/database servers and configuring their connections in CM
 * Provisioning the [Reddit Clients](#provisioning-a-reddit-client) needed to run bots and the CM UI
-* Providing [global-level configuration](/docs/operator/configuration.md) that affects general bot/subreddit behavior
+* Providing [global-level configuration](configuration.md) that affects general bot/subreddit behavior
 * Onboarding new bots/subreddits
 
 # Table of Contents
 
 * [Overview](#overview)
-  * [Client-Server Architecture](/docs/serverClientArchitecture.md)
-* [Getting Started](/docs/operator/gettingStarted.md)
-* [Installation](/docs/operator/installation.md)
+  * [Client-Server Architecture](serverClientArchitecture.md)
+* [Getting Started](gettingStarted.md)
+* [Installation](installation.md)
 * [Provisioning a Reddit Client](#provisioning-a-reddit-client)
-* [Configuration](/docs/operator/configuration.md)
-* [Adding A Bot](/docs/operator/addingBot.md)
+* [Configuration](configuration.md)
+* [Adding A Bot](addingBot.md)
 
 # Overview
 
@@ -33,13 +33,13 @@ CM is composed of two applications that operate independently but are packaged t
 
 Both applications authenticate, and are primarily operated, by using [Reddit's API through OAuth.](https://github.com/reddit-archive/reddit/wiki/OAuth2) The **Client** uses OAuth to verify the identity of moderators logging into the web interface. The **Server** uses oauth tokens to interact with Reddit's API and operate all the configured bots.
 
-In its default mode of operation CM takes care of all the interaction between **Server** and **Client** for you so that you can effectively treat it as a monolithic application. Learn more about CM's architecture and other operation modes in the [Server-Client Architecture documentation.](/docs/serverClientArchitecture.md)
+In its default mode of operation CM takes care of all the interaction between **Server** and **Client** for you so that you can effectively treat it as a monolithic application. Learn more about CM's architecture and other operation modes in the [Server-Client Architecture documentation.](../serverClientArchitecture.md)
 
-# [Getting Started](/docs/operator/gettingStarted.md)
+# [Getting Started](gettingStarted.md)
 
-The [Getting Started](/docs/operator/gettingStarted.md) guide serves as a straight-forward "how-to" for standing up a CM server from scratch with minimal explanation.
+The [Getting Started](gettingStarted.md) guide serves as a straight-forward "how-to" for standing up a CM server from scratch with minimal explanation.
 
-# [Installation](/docs/operator/installation.md)
+# [Installation](installation.md)
 
 CM has many installation options:
 
@@ -47,7 +47,7 @@ CM has many installation options:
 * Built/pulled from a Docker image hosted on Dockerhub
 * Deployed to Heroku with a Quick Deploy template (experimental)
 
-Refer to the [Installation](/docs/operator/installation.md) docs for more information.
+Refer to the [Installation](installation.md) docs for more information.
 
 # Provisioning A Reddit Client
 
@@ -65,18 +65,18 @@ Click **create app**.
 
 Then write down your **Client ID, Client Secret, and Redirect Uri** somewhere
 
-# [Configuration](/docs/operator/configuration.md)
+# [Configuration](configuration.md)
 
-The [Configuration](/docs/operator/configuration.md) documentation covers:
+The [Configuration](configuration.md) documentation covers:
 
 * How CM's configuration can be defined
 * How to create and define location for a config file
 * Running CM from the command line
 * Documentation for configuration on Bots, the web client, API, and more...
 
-# [Adding A Bot](/docs/operator/addingBot.md)
+# [Adding A Bot](addingBot.md)
 
-The [Adding A Bot](/docs/operator/addingBot.md) documentation covers:
+The [Adding A Bot](addingBot.md) documentation covers:
 
 * What is a Bot?
 * What is needed to add a Bot to CM?

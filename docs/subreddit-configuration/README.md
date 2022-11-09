@@ -82,7 +82,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
 
 # Runs
 
-A **Run** is made up of a set of [**Checks**](#checks) that represent a group of related behaviors the bot should check for or perform. Checks within a Run are processed in the order they are listed. Refer to the [How It Works](/docs/README.md#how-it-works) section to see how Runs fit into CM's lifecycle.
+A **Run** is made up of a set of [**Checks**](#checks) that represent a group of related behaviors the bot should check for or perform. Checks within a Run are processed in the order they are listed. Refer to the [How It Works](../README.md#how-it-works) section to see how Runs fit into CM's lifecycle.
 
 **Runs** are the largest unit of behavior in a subreddit's configuration and are defined at the top level of the configuration like so:
 
@@ -142,13 +142,13 @@ A **Check** is a set of:
 * Zero or more [**Rules**](#rules) that define what conditions should **trigger** this Check.
 * Zero or more [**Actions**](#actions) that define what the bot should do once the Check is **triggered**.
 
-Refer to the [How It Works](/docs/README.md#how-it-works) section to see how Checks fit into CM's lifecycle.
+Refer to the [How It Works](../README.md#how-it-works) section to see how Checks fit into CM's lifecycle.
 
 * If a Check has no Rules and passes any [Filters](#filters) it is automatically triggered
 * If a Check is triggered and has no Actions it is only [recorded](#recording-options)
 * **Checks must have explicitly defined:**
   * **name**
-  * **kind** -- what type of [Activity](/docs/README.md#activity) (`submission` or `comment`) it should process
+  * **kind** -- what type of [Activity](../README.md#activity) (`submission` or `comment`) it should process
 
 ```yaml
 runs:
@@ -224,11 +224,11 @@ This enables a user to arbitrarily configure how CM responds to the triggering (
 
 Each Check will **always** have these properties defined -- either explicitly or passed down as defaults from a [Run](#flow-control-defaults-using-runs), [Subreddit](#filter-defaults), or Operator configuration.
 
-Refer to the main [**Flow Control** documentation](/docs/moderators/components/advancedConcepts/flowControl.md) for an in-depth explanation and all possible options.
+Refer to the main [**Flow Control** documentation](advancedConcepts/flowControl.md) for an in-depth explanation and all possible options.
 
 ## Recording Options
 
-`postFail` and `postTrigger` also enable specifying if/how an [Event](/docs/README.md#event) is recorded. Valid options for recording:
+`postFail` and `postTrigger` also enable specifying if/how an [Event](../README.md#event) is recorded. Valid options for recording:
 
 * `false` -- do not record this Event
 * `true` -- record Event to all available outputs
@@ -258,7 +258,7 @@ When an Activity has finished being processed CM will aggregate all Recording Op
 
 # Rules
 
-A **Rule** is some set of **criteria** (conditions) that are tested against an [Activity](/docs/README.md#activity), a User, or a User's history. A Rule is considered **triggered** when the **criteria** for that rule are found to be **true** for whatever is being tested against.
+A **Rule** is some set of **criteria** (conditions) that are tested against an [Activity](../README.md#activity), a User, or a User's history. A Rule is considered **triggered** when the **criteria** for that rule are found to be **true** for whatever is being tested against.
 
 Rules must have a `kind` that identifies what kind of Rule they are.
 
@@ -301,13 +301,13 @@ runs:
 
 Named Rules are essential building blocks of a readable and effective configuration. If you find yourself repeating the same Rule many times it's a sign you should give it a name and replace it's usage with references to it.
 
-See **Rule Name Reuse Examples [YAML](/docs/moderators/components/advancedConcepts/ruleNameReuse.yaml) | [JSON](/docs/moderators/components/advancedConcepts/ruleNameReuse.json5)**
+See **Rule Name Reuse Examples [YAML](advancedConcepts/ruleNameReuse.yaml) | [JSON](advancedConcepts/ruleNameReuse.json5)**
 
 ## List of Rules
 
 ### Attribution
 
-[**Full Documentation**](/docs/moderators/components/attribution)
+[**Full Documentation**](in-depth/attribution)
 
 The **Attribution** rule will aggregate an Author's content Attributions (youtube channels, twitter, website domains, etc.) and can check on their totals or percentages of all Activities over a time period:
 
@@ -318,7 +318,7 @@ The **Attribution** rule will aggregate an Author's content Attributions (youtub
 
 ### Recent Activity
 
-[**Full Documentation**](/docs/moderators/components/recentActivity)
+[**Full Documentation**](in-depth/recentActivity)
 
 Given a list subreddit criteria, the **Recent Activity** rule finds Activities matching those criteria in the Author's history over [window](#activities-window) and then allows for comparing different facets of the results:
 
@@ -332,12 +332,12 @@ The search can also be modified in a number of ways:
 
 * Filter found activities using an [Item Filter](#item-filter)
 * Only return activities that match the Activity from the Event being processed
-  * Using [image detection](/docs/imageComparison.md) (pixel or perceptual hash matching)
+  * Using [image detection](imageComparison.md) (pixel or perceptual hash matching)
 * Only return certain types of activities (only submission or only comments)
 
 ### Repeat Activity
 
-[**Full Documentation**](/docs/moderators/components/repeatActivity)
+[**Full Documentation**](in-depth/repeatActivity)
 
 The **Repeat Activity** rule will check for patterns of repetition in an Author's Activity history over a [window](#activities-window). When comparing submissions it checks a composite of the submissions' title and content.
 
@@ -352,7 +352,7 @@ Some of the ways the rule can be modified:
 
 ### History
 
-[**Full Documentation**](/docs/moderators/components/history)
+[**Full Documentation**](in-depth/history)
 
 The **History** rule can check an Author's submission/comment statistics over a time period:
 
@@ -362,33 +362,33 @@ The **History** rule can check an Author's submission/comment statistics over a 
 
 ### Author
 
-[**Full Documentation**](/docs/moderators/components/author)
+[**Full Documentation**](in-depth/author)
 
 The **Author** rule behaves the same as the [Author Filter](#author-filter). It can be used when you want to test Author state alongside other rules to create more complex behavior than would be possible by only applying to individual Rules or an entire check.
 
 ### Regex
 
-[**Full Documentation**](/docs/moderators/components/regex)
+[**Full Documentation**](in-depth/regex)
 
 The **Regex** rule matches on text content from an Activity in the same way automod uses regex. However, it can also be used to match on content from the Author's Activity history over a [window](#activities-window).
 
 ### Repost
 
-[**Full Documentation**](/docs/moderators/components/repost)
+[**Full Documentation**](in-depth/repost)
 
 The **Repost** rule is used to find reposts for both **Submissions** and **Comments**, depending on what type of **Check** it is used on.
 
-This rule is for searching **all of Reddit** for reposts, as opposed to just the history of the Author of the Activity being checked. If you only want to check for reposts by the Author of the Activity being checked you should use the [Repeat Activity](/docs/moderators/components/repeatActivity) rule.
+This rule is for searching **all of Reddit** for reposts, as opposed to just the history of the Author of the Activity being checked. If you only want to check for reposts by the Author of the Activity being checked you should use the [Repeat Activity](repeatActivity) rule.
 
 ### Sentiment Analysis
 
-[**Full Documentation**](/docs/moderators/components/sentiment)
+[**Full Documentation**](in-depth/sentiment)
 
 The **Sentiment Rule** is used to determine the overall emotional intent (negative, neutral, positive) of a Submission or Comment by analyzing the actual text content of the Activity.
 
 ### ModerateHateSpeech.com Predictions
 
-[**Full Documentation**](/docs/moderators/components/mhs)
+[**Full Documentation**](in-depth/mhs)
 
 ContextMod integrates with [moderatehatespeech.com](https://moderatehatespeech.com/) (MHS) [toxic content machine learning model](https://moderatehatespeech.com/framework/) through their API. This rule sends an Activity's content (title or body) to MHS which returns a prediction on whether the content is toxic and actionable by a moderator. Their model is [specifically trained for reddit content.](https://www.reddit.com/r/redditdev/comments/xdscbo/updated_bot_backed_by_moderationoriented_ml_for/)
 
@@ -427,7 +427,7 @@ runs:
                 ...
 ```
 
-See **ruleSets [YAML](/docs/moderators/components/advancedConcepts/ruleSets.yaml) | [JSON](/docs/moderators/components/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
+See **ruleSets [YAML](advancedConcepts/ruleSets.yaml) | [JSON](advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
 
 # Actions
 
@@ -471,7 +471,7 @@ runs:
 
 Actions that can submit text (Report, Comment, UserNote) will have their `content` values run through a [Mustache Template](https://mustache.github.io/). This means you can insert data generated by Rules into your text before the Action is performed.
 
-[**Action Templating Documentation**](/docs/moderators/actionTemplating.md)
+[**Action Templating Documentation**](actionTemplating.md)
 
 ## List of Actions
 
@@ -743,7 +743,7 @@ actions:
 Remove the Activity being processed. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FRemoveActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 
 * **note** can be [templated](#templating)
-* **reasonId** IDs can be found in the [editor](/docs/webInterface.md) using the **Removal Reasons** popup
+* **reasonId** IDs can be found in the [editor](../webInterface.md) using the **Removal Reasons** popup
 
 If neither note nor reasonId are included then no removal reason is added.
 
@@ -771,7 +771,7 @@ actions:
 
 Add a Toolbox User Note to the Author of the Activity. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FUserNoteActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 
-Your subreddit must have [Toolbox UserNotes](/docs/moderators/components/userNotes) enabled for this action to work.
+Your subreddit must have [Toolbox UserNotes](in-depth/userNotes) enabled for this action to work.
 
 * `type` is required
 * `content` can be [templated](#templating) and use [URL Tokens](#url-tokens)
@@ -786,7 +786,7 @@ actions:
 
 ### Mod Note
 
-[**Full Documentation**](/docs/moderators/components/modActions/README.md#mod-note-action)
+[**Full Documentation**](in-depth/modActions/README.md#mod-note-action)
 
 Add a [Mod Note](https://www.reddit.com/r/modnews/comments/t8vafc/announcing_mod_notes/) for the Author of the Activity.
 
@@ -892,11 +892,11 @@ Test the Author of an Activity. See [Schema documentation](https://json-schema.a
 
 #### Mod Actions/Notes Filter
 
-See [Mod Actions/Notes](/docs/moderators/components/modActions/README.md#mod-action-filter) documentation.
+See [Mod Actions/Notes](in-depth/modActions/README.md#mod-action-filter) documentation.
 
 #### Toolbox UserNotes Filter
 
-See [UserNotes](/docs/moderators/components/userNotes/README.md) documentation
+See [UserNotes](in-depth/userNotes/README.md) documentation
 
 ### Item Filter
 
@@ -981,7 +981,7 @@ These conditions can be combined together to evaluate to either true or false us
 
 Most **Rules** have a `window` property somewhere within their configuration. This property defines the range of **Activities** (submission and/or comments) that should be retrieved for checking the criteria of the Rule.
 
-[Full Activities `window` documentation](/docs/moderators/activitiesWindow.md)
+[Full Activities `window` documentation](activitiesWindow.md)
 
 ## URL Tokens
 
@@ -1043,7 +1043,7 @@ Some criteria accept an optional **duration** to compare against:
 
 The duration value compares a time range from **now** to `duration value` time in the past.
 
-Refer to [duration values in activity window documentation](/docs/moderators/activitiesWindow.md#duration-values) as well as the individual rule/criteria schema to see what this duration is comparing against.
+Refer to [duration values in activity window documentation](activitiesWindow.md#duration-values) as well as the individual rule/criteria schema to see what this duration is comparing against.
 
 ## Filter Defaults
 
@@ -1077,7 +1077,7 @@ In other words -- Checks will not run if the Author of the Activity being proces
 
 ## Flow Control Defaults
 
-See [Flow Control Documentation](/docs/moderators/components/advancedConcepts/flowControl.md#default-behaviors)
+See [Flow Control Documentation](advancedConcepts/flowControl.md#default-behaviors)
 
 # Subreddit-Level Configuration
 
@@ -1087,7 +1087,7 @@ See [Filter Defaults](#filter-defaults) and [Flow Control Defaults](#flow-contro
 
 ## Polling
 
-**Polling** is how ContextMod creates [Events](/docs/README.md#event) from new Activities in a Subreddit. CM monitors one or more polling sources and processes any new Activities it discovers.
+**Polling** is how ContextMod creates [Events](../README.md#event) from new Activities in a Subreddit. CM monitors one or more polling sources and processes any new Activities it discovers.
 
 ### Polling Sources
 
@@ -1219,7 +1219,7 @@ Re-use will result in less API calls and faster Check times.
 
 PROTIP: You can monitor the re-use of cache in the `Cache` section of your subreddit on the web interface. See the tooltips in that section for a better breakdown of cache statistics.
 
-[Learn more about how Caching works](/docs/operator/caching.md)
+[Learn more about how Caching works](../operator/caching.md)
 
 ## Partial Configurations
 
@@ -1403,4 +1403,4 @@ runs:
 
 # Subreddit-Ready Examples
 
-Refer to the [Subreddit Cookbook Examples](/docs/moderators/components/cookbook) section to find ready-to-use configurations for common scenarios (spam, freekarma blocking, etc...). This is also a good place to familiarize yourself with what complete configurations look like.
+Refer to the [Subreddit Cookbook Examples](cookbook) section to find ready-to-use configurations for common scenarios (spam, freekarma blocking, etc...). This is also a good place to familiarize yourself with what complete configurations look like.

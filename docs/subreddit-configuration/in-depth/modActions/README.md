@@ -16,9 +16,9 @@ parent: In Depth
 
 # Overview
 
-[Mod Notes](https://www.reddit.com/r/modnews/comments/t8vafc/announcing_mod_notes/) is a feature for New Reddit that allow moderators to add short, categorizable notes to Users of their subreddit, optionally associating te note with a submission/comment the User made. They are inspired by [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) which are also [supported by ContextMod.](/docs/moderators/components/userNotes) Reddit's **Mod Notes** also combine [Moderation Log](https://mods.reddithelp.com/hc/en-us/articles/360022402312-Moderation-Log) actions (**Mod Actions**) for the selected User alongside moderator notes, enabling a full "overview" of moderator interactions with a User in their subreddit.
+[Mod Notes](https://www.reddit.com/r/modnews/comments/t8vafc/announcing_mod_notes/) is a feature for New Reddit that allow moderators to add short, categorizable notes to Users of their subreddit, optionally associating te note with a submission/comment the User made. They are inspired by [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) which are also [supported by ContextMod.](../userNotes) Reddit's **Mod Notes** also combine [Moderation Log](https://mods.reddithelp.com/hc/en-us/articles/360022402312-Moderation-Log) actions (**Mod Actions**) for the selected User alongside moderator notes, enabling a full "overview" of moderator interactions with a User in their subreddit.
 
-ContextMod supports adding **Mod Notes** to an Author using an [Action](/docs/moderators/components/README.md#mod-note) and using **Mod Actions/Mod Notes** as a criteria in an [Author Filter](/docs/moderators/components/README.md#author-filter)
+ContextMod supports adding **Mod Notes** to an Author using an [Action](../../README.md#mod-note) and using **Mod Actions/Mod Notes** as a criteria in an [Author Filter](../../README.md#author-filter)
 
 # Mod Note Action
 
@@ -44,7 +44,7 @@ actions:
 
 # Mod Action Filter
 
-ContextMod can use **Mod Actions** (from moderation log) and **Mod Notes** in an [Author Filter](/docs/moderators/components/README.md#author-filter).
+ContextMod can use **Mod Actions** (from moderation log) and **Mod Notes** in an [Author Filter](../../../README.md#author-filter).
 
 ## API Usage
 
@@ -68,15 +68,15 @@ Mod Action Filtering Used
 
 In general,**do not** use Mod Actions in a Filter if:
 
-* The filter is on a [**Comment** Check](/docs/moderators/components/README.md#checks) and your subreddit has a high volume of Comments
-* The filter is on a [Run](/docs/moderators/components/README.md#runs) and your subreddit has a high volume of Activities
+* The filter is on a [**Comment** Check](../../README.md#checks) and your subreddit has a high volume of Comments
+* The filter is on a [Run](../../README.md#runs) and your subreddit has a high volume of Activities
 
-If you need Mod Notes-like functionality for a high volume subreddit consider using [Toolbox UserNotes](/docs/moderators/components/userNotes) instead.
+If you need Mod Notes-like functionality for a high volume subreddit consider using [Toolbox UserNotes](../userNotes) instead.
 
 In general, **do** use Mod Actions in a Filter if:
 
-* The filter is on a [**Submission** Check](/docs/moderators/components/README.md#checks)
-* The filter is part of an [Author **Rule**](/docs/moderators/components/README.md#author) that is processed as **late as possible in the rule order for a Check**
+* The filter is on a [**Submission** Check](../../README.md#checks)
+* The filter is part of an [Author **Rule**](../../README.md#author) that is processed as **late as possible in the rule order for a Check**
 * Your subreddit has a low volume of Activities (less than 100 combined submissions/comments in a 10 minute period, for example)
 * The filter is on an Action
 

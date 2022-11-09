@@ -16,7 +16,7 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FHistoryJSO
 
 ## Ratio
 
-Use the `ratio` property in Criteria to test the [number of activities](/docs/moderators/activitiesWindow.md) found in the parent criteria against the number of activities from _another_ [activity window](/docs/moderators/activitiesWindow.md) defined in the ratio.
+Use the `ratio` property in Criteria to test the [number of activities](../../activitiesWindow.md) found in the parent criteria against the number of activities from _another_ [activity window](../../activitiesWindow.md) defined in the ratio.
 
 Example:
 
@@ -51,10 +51,10 @@ Example:
 
 ### Examples
 
-* Low Comment Engagement [YAML](/docs/moderators/components/history/lowEngagement.yaml) | [JSON](/docs/moderators/components/history/lowEngagement.json5) - Check if Author is submitting much more than they comment.
-* OP Comment Engagement [YAML](/docs/moderators/components/history/opOnlyEngagement.yaml) | [JSON](/docs/moderators/components/history/opOnlyEngagement.json5) - Check if Author is mostly engaging only in their own content
+* Low Comment Engagement [YAML](lowEngagement.yaml) | [JSON](lowEngagement.json5) - Check if Author is submitting much more than they comment.
+* OP Comment Engagement [YAML](opOnlyEngagement.yaml) | [JSON](opOnlyEngagement.json5) - Check if Author is mostly engaging only in their own content
 
-# [Template Variables](/docs/moderators/actionTemplating.md)
+# [Template Variables](../../actionTemplating.md)
 
 |         Name         |                              Description                               |                      Example                       |
 |----------------------|------------------------------------------------------------------------|----------------------------------------------------|

@@ -108,7 +108,7 @@ rules:
 
 #### Historical Matching
 
-Like the [Sentiment](/docs/moderators/components/sentiment#historical) and [Regex](/docs/moderators/components/regex#historical) rules CM can also use MHS predictions to check content from the Author's history.
+Like the [Sentiment](../sentiment#historical) and [Regex](../regex#historical) rules CM can also use MHS predictions to check content from the Author's history.
 
 Example
 
@@ -123,7 +123,7 @@ rules:
       criteria: #... if specified, overrides parent-level criteria
 ```
 
-# [Template Variables](/docs/moderators/actionTemplating.md)
+# [Template Variables](../../actionTemplating.md)
 
 
 |      Name       |                                  Description                                  | Example                                                                                                                                                |

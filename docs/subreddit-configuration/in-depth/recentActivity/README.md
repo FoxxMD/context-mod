@@ -5,7 +5,7 @@ parent: In Depth
 
 # Recent Activity Rule
 
-Given a list subreddit criteria, the **Recent Activity** rule finds Activities matching those criteria in the Author's history over [window](#activities-window) and then allows for comparing different facets of the results.
+Given a list subreddit criteria, the **Recent Activity** rule finds Activities matching those criteria in the Author's history over [window](../../activitiesWindow.md) and then allows for comparing different facets of the results.
 
 Subreddit criteria can be:
 
@@ -32,10 +32,10 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRecentActi
 
 ### Examples
 
-* Free Karma Subreddits [YAML](/docs/moderators/components/recentActivity/freeKarma.yaml) | [JSON](/docs/moderators/components/recentActivity/freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
-* Submission in Free Karma Subreddits [YAML](/docs/moderators/components/recentActivity/freeKarmaOnSubmission.yaml) | [JSON](/docs/moderators/components/recentActivity/freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
+* Free Karma Subreddits [YAML](freeKarma.yaml) | [JSON](freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
+* Submission in Free Karma Subreddits [YAML](freeKarmaOnSubmission.yaml) | [JSON](freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
 
-# [Template Variables](/docs/moderators/actionTemplating.md)
+# [Template Variables](../../actionTemplating.md)
 
 |         Name         |                        Description                         |                                                                   Example                                                                    |
 |----------------------|------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|

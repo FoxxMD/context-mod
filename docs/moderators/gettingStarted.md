@@ -6,7 +6,7 @@ nav_order: 1
 # Getting Started
 
 This getting started guide is for **reddit moderators** -- that is, someone who wants **an existing ContextMod bot to run on their subreddit.** If you are trying to run a ContextMod
-instance (software) please refer to the [operator getting started](/docs/operator/gettingStarted.md) guide.
+instance (software) please refer to the [operator getting started](../operator/gettingStarted.md) guide.
 
 # Table of Contents
 
@@ -21,8 +21,8 @@ instance (software) please refer to the [operator getting started](/docs/operato
 
 Before continuing with this guide you should first make sure you understand how a ContextMod works. Please review this documentation:
 
-* [How It Works](/docs/README.md#how-it-works)
-* [Core Concepts](/docs/README.md#concepts)
+* [How It Works](../README.md#how-it-works)
+* [Core Concepts](../README.md#concepts)
 
 # Choose A Bot
 
@@ -88,7 +88,7 @@ The default location for this page is at `https://old.reddit.com/r/YOURSUBERDDIT
 
 The bot automatically tries to create its configuration wiki page. You can find the result of this in the log for your subreddit in the web interface.
 
-If this fails for some reason you can create the wiki page through the web interface by navigating to your subreddit's tab, opening the [built-in editor (click **View**)](/docs/images/configBox.png), and following the directions in **Create configuration for...** link found there.
+If this fails for some reason you can create the wiki page through the web interface by navigating to your subreddit's tab, opening the [built-in editor (click **View**)](../images/configBox.png), and following the directions in **Create configuration for...** link found there.
 
 If neither of the above approaches work, or you do not wish to use the web interface, expand the section below for directions on how to manually setup the wiki page:
 
@@ -111,11 +111,11 @@ If you already have a configuration you may skip the below step and go directly 
 
 ### Using an Example Config
 
-Visit the [Examples](https://github.com/FoxxMD/context-mod/tree/master/docs/examples) folder to find various examples of individual rules or see the [subreddit cookbook examples.](/docs/moderators/components/cookbook)
+Visit the [Examples](https://github.com/FoxxMD/context-mod/tree/master../examples) folder to find various examples of individual rules or see the [subreddit cookbook examples.](../subreddit-configuration/cookbook)
 
 After you have found a configuration to use as a starting point:
 
-* Copy the URL for the configuration file EX `https://github.com/FoxxMD/context-mod/blob/master/docs/examples/subredditReady/freekarma.json5` and either:
+* Copy the URL for the configuration file EX `https://github.com/FoxxMD/context-mod/blob/master../examples/subredditReady/freekarma.json5` and either:
   * (Easiest) **Load** it into your [subreddit's built-in editor](#using-the-built-in-editor) and **Save**
   * or on the file's page, click the **Raw** button, select all and copy to your clipboard, and [manually save to your wiki page](#manually-saving)
 
@@ -143,7 +143,7 @@ PROTIP: Find an [example config](#using-an-example-config) to use as a starting 
 In the web interface each subreddit's tab has access to the built-in editor. Use this built-in editor to automatically create, load, or save the configuration for that subreddit's wiki.
 
 * Visit the tab for the subreddit you want to edit the configuration of
-* Open the [built-in editor by click **View**](/docs/images/configBox.png)
+* Open the [built-in editor by click **View**](../images/configBox.png)
 * Edit your configuration
 * Follow the directions on the **Save to r/..** link found at the top of the editor to automatically save your configuration
 

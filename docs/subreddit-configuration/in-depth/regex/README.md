@@ -9,7 +9,7 @@ The **Regex** rule matches on text content from a comment or submission in the s
 
 * Can set the **number** of matches that trigger the rule (`matchThreshold`)
 
-Which can then be used in conjunction with a [`window`](https://github.com/FoxxMD/context-mod/blob/master/docs/activitiesWindow.md) to match against activities from the history of the Author of the Activity being checked (including the Activity being checked):
+Which can then be used in conjunction with a [`window`](../../activitiesWindow.md) to match against activities from the history of the Author of the Activity being checked (including the Activity being checked):
 
 * Can set the **number of Activities** that meet the `matchThreshold` to trigger the rule (`activityMatchThreshold`)
 * Can set the **number of total matches** across all Activities to trigger the rule (`totalMatchThreshold`)
@@ -18,17 +18,17 @@ Which can then be used in conjunction with a [`window`](https://github.com/FoxxM
 
 ### Examples
 
-* Trigger if regex matches against the current activity - [YAML](/docs/moderators/components/regex/matchAnyCurrentActivity.yaml) | [JSON](/docs/moderators/components/regex/matchAnyCurrentActivity.json5)
-* Trigger if regex matches 5 times against the current activity - [YAML](/docs/moderators/components/regex/matchThresholdCurrentActivity.yaml) | [JSON](/docs/moderators/components/regex/matchThresholdCurrentActivity.json5)
-* Trigger if regex matches against any part of a Submission - [YAML](/docs/moderators/components/regex/matchSubmissionParts.yaml) | [JSON](/docs/moderators/components/regex/matchSubmissionParts.json5)
-* Trigger if regex matches any of Author's last 10 activities - [YAML](/docs/moderators/components/regex/matchHistoryActivity.yaml) | [JSON](/docs/moderators/components/regex/matchHistoryActivity.json5)
-* Trigger if regex matches at least 3 of Author's last 10 activities - [YAML](/docs/moderators/components/regex/matchActivityThresholdHistory.json5) | [JSON](/docs/moderators/components/regex/matchActivityThresholdHistory.json5)
-* Trigger if there are 5 regex matches in the Author's last 10 activities - [YAML](/docs/moderators/components/regex/matchTotalHistoryActivity.yaml) | [JSON](/docs/moderators/components/regex/matchTotalHistoryActivity.json5) 
-* Trigger if there are 5 regex matches in the Author's last 10 comments - [YAML](/docs/moderators/components/regex/matchSubsetHistoryActivity.yaml) | [JSON](/docs/moderators/components/regex/matchSubsetHistoryActivity.json5)
-* Remove comments that are spamming discord links - [YAML](/docs/moderators/components/regex/removeDiscordSpam.yaml) | [JSON](/docs/moderators/components/regex/removeDiscordSpam.json5)
+* Trigger if regex matches against the current activity - [YAML](matchAnyCurrentActivity.yaml) | [JSON](matchAnyCurrentActivity.json5)
+* Trigger if regex matches 5 times against the current activity - [YAML](matchThresholdCurrentActivity.yaml) | [JSON](matchThresholdCurrentActivity.json5)
+* Trigger if regex matches against any part of a Submission - [YAML](matchSubmissionParts.yaml) | [JSON](matchSubmissionParts.json5)
+* Trigger if regex matches any of Author's last 10 activities - [YAML](matchHistoryActivity.yaml) | [JSON](matchHistoryActivity.json5)
+* Trigger if regex matches at least 3 of Author's last 10 activities - [YAML](matchActivityThresholdHistory.json5) | [JSON](matchActivityThresholdHistory.json5)
+* Trigger if there are 5 regex matches in the Author's last 10 activities - [YAML](matchTotalHistoryActivity.yaml) | [JSON](matchTotalHistoryActivity.json5) 
+* Trigger if there are 5 regex matches in the Author's last 10 comments - [YAML](matchSubsetHistoryActivity.yaml) | [JSON](matchSubsetHistoryActivity.json5)
+* Remove comments that are spamming discord links - [YAML](removeDiscordSpam.yaml) | [JSON](removeDiscordSpam.json5)
   * Differs from just using automod because this config can allow one-off/organic links from users who DO NOT spam discord links but will still remove the comment if the user is spamming them
 
-# [Template Variables](/docs/moderators/actionTemplating.md)
+# [Template Variables](../../actionTemplating.md)
 
 |     Name      |                       Description                       |                                                               Example                                                                |
 |---------------|---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|

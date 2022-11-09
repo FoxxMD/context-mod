@@ -189,7 +189,7 @@ actions:
   - kind: remove
 ```
 
-# [Template Variables](/docs/moderators/actionTemplating.md)
+# [Template Variables](../../actionTemplating.md)
 
 |           Name            |                                           Description                                            |                                Example                                |
 |---------------------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|

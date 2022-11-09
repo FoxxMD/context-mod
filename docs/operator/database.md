@@ -37,16 +37,16 @@ databaseConfig:
 
 ## SQLite
 
-When using a [local installation](/docs/installation.md#locally) the default database is `sqljs`, which requires no binary dependencies. When using [docker](/docs/operator/installation.md#docker-recommended) the default is `better-sqlite3`.
+When using a [local installation](installation.md#locally) the default database is `sqljs`, which requires no binary dependencies. When using [docker](installation.md#docker-recommended) the default is `better-sqlite3`.
 
 **NOTE:** It is **NOT RECOMMENDED** to use `sqljs` in a production environment for performance reasons. You should at least switch to `better-sqlite3` or preferably MySql/Postgres.
 
 * [`sqljs` connection options](https://typeorm.io/data-source-options#sqljs-data-source-options)
 * [`better-sqlite3` connection options](https://typeorm.io/data-source-options#better-sqlite3-data-source-options)
 
-For both sqlite types, if no database/location is specified, it will be created in the [`DATA_DIR` directory.](/docs/operator/configuration.md#specify-file-location)
+For both sqlite types, if no database/location is specified, it will be created in the [`DATA_DIR` directory.](configuration.md#specify-file-location)
 
-If CM detects it cannot **read and write** to the database files, or directory if no files exist, it will fallback to using an in-memory database that will be lost when CM restarts. If you have trouble with r/w permissions and are using docker make sure [file permissions are correct for your mounted volume.](/docs/operator/installation.md#linux-host)
+If CM detects it cannot **read and write** to the database files, or directory if no files exist, it will fallback to using an in-memory database that will be lost when CM restarts. If you have trouble with r/w permissions and are using docker make sure [file permissions are correct for your mounted volume.](installation.md#linux-host)
 
 ## MySQL/MariaDB
 
@@ -178,7 +178,7 @@ influxConfig:
 
 A pre-built dashboard for [Grafana](https://grafana.com) can be imported to display overall metrics/stats using InfluxDB data.
 
-![Grafana Dashboard](/docs/images/grafana.jpg)
+![Grafana Dashboard](../images/grafana.jpg)
 
 * Create a new Data Source using **InfluxDB** type
   * Choose **Flux** for the **Query Language**
@@ -187,7 +187,7 @@ A pre-built dashboard for [Grafana](https://grafana.com) can be imported to disp
   * Click **Save and test**
 * Import Dashboard
   * **Browse** the Dashboard pane
-  * Click **Import** and **upload** the [grafana dashboard json file](/docs/operator/grafana.json)
+  * Click **Import** and **upload** the [grafana dashboard json file](grafana.json)
     * Chose the data source you created from the **InfluxDB CM** dropdown
     * Click **Import**
 

@@ -43,7 +43,7 @@ configuration.
 Using a file has many benefits over using ARG or ENV:
 
 * CM can automatically update your configuration
-* CM can automatically add bots via the [CM OAuth Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended)
+* CM can automatically add bots via the [CM OAuth Helper](addingBot.md#cm-oauth-helper-recommended)
 * CM has a built-in configuration editor that can help you build and validate your configuration file
 * File config is **required** if adding multiple bots to CM
 
@@ -51,8 +51,8 @@ Using a file has many benefits over using ARG or ENV:
 
 By default CM will look for `config.yaml` or `config.json` in the `DATA_DIR` directory:
 
-* [Local installation](/docs/operator/installation.md#locally) -- `DATA_DIR` is the root of your installation directory (same folder as `package.json`)
-* [Docker](/docs/operator/installation.md#docker-recommended) -- `DATA_DIR` is at `/config` in the container
+* [Local installation](installation.md#locally) -- `DATA_DIR` is the root of your installation directory (same folder as `package.json`)
+* [Docker](installation.md#docker-recommended) -- `DATA_DIR` is at `/config` in the container
 
 The `DATA_DIR` directory can be changed by passing `DATA_DIR` as an environmental variable EX `DATA_DIR=/path/to/directory`
 
@@ -72,7 +72,7 @@ One ContextMod instance can
 
 However, the default configuration (using **ENV/ARG**) assumes your intention is to run one bot (one reddit account) on one CM instance without these additional features. This is to make this mode of operation easier for users with this intention.
 
-To take advantage of this additional features you **must** use a **FILE** configuration. Learn about how this works and how to configure this scenario in the [Architecture Documentation.](/docs/serverClientArchitecture.md)
+To take advantage of this additional features you **must** use a **FILE** configuration. Learn about how this works and how to configure this scenario in the [Architecture Documentation.](serverClientArchitecture.md)
 
 ## CLI Usage
 
@@ -131,11 +131,11 @@ Options:
 
 # Minimum Configuration
 
-The minimum configuration required to run CM assumes you have no bots and want to use CM to [add your first bot.](/docs/operator/addingBot.md#cm-oauth-helper-recommended)
+The minimum configuration required to run CM assumes you have no bots and want to use CM to [add your first bot.](addingBot.md#cm-oauth-helper-recommended)
 
 You will need have this information available:
 
-* From [provision a reddit client](/docs/operator/README.md#provisioning-a-reddit-client)
+* From [provision a reddit client](README.md#provisioning-a-reddit-client)
   * Client ID
   * Client Secret
   * Redirect URI (if different from default `http://localhost:8085/callback`)
@@ -160,7 +160,7 @@ Configured using the `bots` top-level property. Bot configuration can override a
 
 ## Adding A Bot
 
-If you use the [CM OAuth Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended) and it works successfully then the configuration for the Bot will be automatically added.
+If you use the [CM OAuth Helper](addingBot.md#cm-oauth-helper-recommended) and it works successfully then the configuration for the Bot will be automatically added.
 
 ### Manually Adding a Bot
 
@@ -335,7 +335,7 @@ log level: debug
 
 ## Configuring Client for Many Instances
 
-See the [Architecture Docs](/docs/serverClientArchitecture.md) for more information.
+See the [Architecture Docs](erverClientArchitecture.md) for more information.
 
 <details>
 
@@ -408,8 +408,8 @@ JSON
 
 # Cache Configuration
 
-See the [Cache Configuration](/docs/operator/caching.md) documentation.
+See the [Cache Configuration](caching.md) documentation.
 
 # Database Configuration
 
-See the [Database Configuration](/docs/operator/database.md) documentation.
+See the [Database Configuration](database.md) documentation.

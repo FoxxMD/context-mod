@@ -13,7 +13,7 @@ The **Attribution** rule will aggregate an Author's content Attribution (youtube
 
 Consult the [schema](https://json-schema.app/view/%23/%23%2Fdefinitions%2FCheckJson/%23%2Fdefinitions%2FAttributionJSONConfig?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) for a complete reference of the rule's properties.
 
-# [Template Variables](/docs/moderators/actionTemplating.md)
+# [Template Variables](../../actionTemplating.md)
 
 |          Name          |                                                                      Description                                                                       |                                          Example                                          |
 |------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
@@ -32,5 +32,5 @@ Consult the [schema](https://json-schema.app/view/%23/%23%2Fdefinitions%2FCheckJ
 
 # Examples
 
-* Self Promotion as percentage of all Activities [YAML](/docs/moderators/components/attribution/redditSelfPromoAll.yaml) | [JSON](/docs/moderators/components/attribution/redditSelfPromoAll.json5) - Check if Author is submitting much more than they comment.
-* Self Promotion as percentage of Submissions [YAML](/docs/moderators/components/attribution/redditSelfPromoSubmissionsOnly.yaml) | [JSON](/docs/examplesm/attribution/redditSelfPromoSubmissionsOnly.json5) - Check if any of Author's aggregated submission origins are >10% of their submissions
+* Self Promotion as percentage of all Activities [YAML](redditSelfPromoAll.yaml) | [JSON](redditSelfPromoAll.json5) - Check if Author is submitting much more than they comment.
+* Self Promotion as percentage of Submissions [YAML](redditSelfPromoSubmissionsOnly.yaml) | [JSON](redditSelfPromoSubmissionsOnly.json5) - Check if any of Author's aggregated submission origins are >10% of their submissions
