@@ -1,3 +1,9 @@
+---
+parent: Operator
+---
+
+# Caching
+
 # Table of Contents
 
 * [Overview](#overview)

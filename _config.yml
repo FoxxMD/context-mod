@@ -1,0 +1,42 @@
+title: ContextMod
+description: Documentation for ContextMod
+theme: just-the-docs
+
+source: docs
+
+url: https://contextmod.dev
+
+color_scheme: dark
+
+aux_links:
+  Github: https://github.com/foxxmd/context-mod
+
+plugins:
+  - jekyll-readme-index
+  - jekyll-default-layout
+  - jekyll-titles-from-headings
+  - jekyll-optional-front-matter
+  - jekyll-relative-links
+
+titles_from_headings:
+  enabled:     true
+  strip_title: false
+  collections: false
+
+readme_index:
+  enabled:          true
+  remove_originals: true
+  with_frontmatter: true
+
+optional_front_matter:
+  remove_originals: true
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      has_toc: false
+  - scope:
+      path: "images"
+    values:
+      image: true

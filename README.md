@@ -16,23 +16,23 @@ An example of the above that Context Bot can do:
 
 Feature Highlights for **Moderators:**
 
-* Complete bot **autonomy**. YAML config is [stored in your subreddit's wiki](/docs/subreddit/gettingStarted.md#setup-wiki-page) (like automoderator)
+* Complete bot **autonomy**. YAML config is [stored in your subreddit's wiki](/docs/moderators/gettingStarted.md#setup-wiki-page) (like automoderator)
 * Simple rule-action behavior can be combined to create **complex behavior detection**
 * Support Activity filtering based on:
-  * [Author criteria](/docs/subreddit/components/README.md#author-filter) (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
-  * [Activity state](/docs/subreddit/components/README.md#item-filter) (removed, locked, distinguished, etc...)
-  * State of Subreddit Activity is in [Subreddit](/docs/subreddit/components/README.md#subreddit-filter) (nsfw, name, profile, etc...)
-* Rules and Actions support [named references](/docs/subreddit/components/README.md#named-rules) -- **write once, reference anywhere**
-* Powerful [logic control](/docs/subreddit/components/advancedConcepts/flowControl.md) (if, then, goto)
-* [Delay/re-process activities](/docs/subreddit/components/README.md#dispatch) using arbitrary rules
+  * [Author criteria](/docs/moderators/components/README.md#author-filter) (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
+  * [Activity state](/docs/moderators/components/README.md#item-filter) (removed, locked, distinguished, etc...)
+  * State of Subreddit Activity is in [Subreddit](/docs/moderators/components/README.md#subreddit-filter) (nsfw, name, profile, etc...)
+* Rules and Actions support [named references](/docs/moderators/components/README.md#named-rules) -- **write once, reference anywhere**
+* Powerful [logic control](/docs/moderators/components/advancedConcepts/flowControl.md) (if, then, goto)
+* [Delay/re-process activities](/docs/moderators/components/README.md#dispatch) using arbitrary rules
 * [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
-* [**Repost detection**](/docs/subreddit/components/repost) with support for external services (youtube, etc...)
+* [**Repost detection**](/docs/moderators/components/repost) with support for external services (youtube, etc...)
 * Event notification via Discord
 * [**Web interface**](#web-ui-and-screenshots) for monitoring, administration, and oauth bot authentication
-* [**Placeholders**](/docs/subreddit/actionTemplating.md) (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) templating
-* [**Partial Configurations**](/docs/subreddit/components/README.md#partial-configurations) -- offload parts of your configuration to shared locations to consolidate logic between multiple subreddits
-* [Guest Access](/docs/subreddit/README.md#guest-access) enables collaboration and easier setup by allowing temporary access
-* [Toxic content prediction](/docs/subreddit/components/README.md#moderatehatespeechcom-predictions) using [moderatehatespeech.com](https://moderatehatespeech.com) machine learning model
+* [**Placeholders**](/docs/moderators/actionTemplating.md) (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) templating
+* [**Partial Configurations**](/docs/moderators/components/README.md#partial-configurations) -- offload parts of your configuration to shared locations to consolidate logic between multiple subreddits
+* [Guest Access](/docs/moderators/README.md#guest-access) enables collaboration and easier setup by allowing temporary access
+* [Toxic content prediction](/docs/moderators/components/README.md#moderatehatespeechcom-predictions) using [moderatehatespeech.com](https://moderatehatespeech.com) machine learning model
 
 Feature highlights for **Developers and Hosting (Operators):**
 
@@ -44,7 +44,7 @@ Feature highlights for **Developers and Hosting (Operators):**
 * [Database Persistence](/docs/operator/database.md) using SQLite, MySql, or Postgres
   * Audit trails for bot activity
   * Historical statistics
-* [Docker container support](/docs/operator/installation.md#docker-recommended)
+* [Docker container](/docs/operator/installation.md#docker-recommended) and [docker-compose](/docs/operator/installation.md#docker-compose) support
 * Easy, UI-based [OAuth authentication](/docs/operator/addingBot.md) for adding Bots and moderator dashboard
 * Integration with [InfluxDB](https://www.influxdata.com) for detailed [time-series metrics](/docs/operator/database.md#influx) and a pre-built [Grafana](https://grafana.com) [dashboard](/docs/operator/database.md#grafana)
 
@@ -59,7 +59,7 @@ Feature highlights for **Developers and Hosting (Operators):**
 
 Each subreddit using the RCB bot configures its behavior via their own wiki page. 
 
-When a monitored **Activity** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of [**Checks**](/docs/subreddit/components/README.md#checks) to determine what to do with the **Activity** from that Event. Each **Check** consists of :
+When a monitored **Activity** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of [**Checks**](/docs/moderators/components/README.md#checks) to determine what to do with the **Activity** from that Event. Each **Check** consists of :
 
 #### Kind
 
@@ -67,11 +67,11 @@ Is this check for a submission or comment?
 
 #### Rules
 
-A list of [**Rules**](/docs/subreddit/components/README.md#rules) to run against the **Activity**. Triggered Rules can cause the whole Check to trigger and run its **Actions**
+A list of [**Rules**](/docs/moderators/components/README.md#rules) to run against the **Activity**. Triggered Rules can cause the whole Check to trigger and run its **Actions**
 
 #### Actions
 
-A list of [**Actions**](/docs/subreddit/components/README.md#actions) that describe what the bot should do with the **Activity** or **Author** of the activity (comment, remove, approve, etc.). The bot will run **all** Actions in this list.
+A list of [**Actions**](/docs/moderators/components/README.md#actions) that describe what the bot should do with the **Activity** or **Author** of the activity (comment, remove, approve, etc.). The bot will run **all** Actions in this list.
 
 ___
 
@@ -95,7 +95,7 @@ See the [Operator's Getting Started Guide](/docs/operator/gettingStarted.md)
 
 This guide is for **reddit moderators** who want to configure an existing CM bot to run on their subreddit.
 
-See the [Moderator's Getting Started Guide](/docs/subreddit/gettingStarted.md)
+See the [Moderator's Getting Started Guide](/docs/moderators/gettingStarted.md)
 
 ## Configuration and Documentation
 

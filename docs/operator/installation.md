@@ -1,3 +1,8 @@
+---
+parent: Operator
+nav_order: 2
+---
+
 # Installation
 
 In order to run a ContextMod instance you must first you must install it somewhere.
@@ -13,7 +18,7 @@ Images available from these registeries:
 * [Dockerhub](https://hub.docker.com/r/foxxmd/context-mod) - `docker.io/foxxmd/context-mod`
 * [GHCR](https://github.com/foxxmd/context-mod/pkgs/container/context-mod) - `ghcr.io/foxxmd/context-mod`
 
-An example of starting the container using the [minimum configuration](/docs/operator/configuration.md#minimum-config):
+An example of starting the container using the [minimum configuration](configuration.md#minimum-config):
 
 * Bind the directory where your config file, logs, and database are located on your host machine into the container's default `DATA_DIR` by using `-v /host/path/folder:/config`
   * Note: **You must do this** or else your configuration will be lost next time your container is updated.
@@ -40,6 +45,32 @@ To get the UID and GID for the current user run these commands from a terminal:
 docker run -d -v /host/path/folder:/config -p 8085:8085 -e PUID=1000 -e PGID=1000 ghcr.io/foxxmd/context-mod:latest
 ```
 
+### Docker-Compose
+
+The included [`docker-compose.yml`](/docker-compose.yml) provides production-ready dependencies for CM to use:
+
+* [Redis](https://redis.io/) for caching
+* [MariaDB](https://mariadb.org/) for database
+* Optionally, [Influx/Grafana](database.md#influx) instances
+
+#### Setup
+
+For new installations copy [`config.yaml`](/docker/config/docker-compose/config.yaml) into a folder named `data` in the same folder `docker-compose.yml` will be run from. For users migrating their existing CM instances to docker-compose, copy your existing `config.yaml` into the same `data` folder.
+
+Read through the comments in both `docker-compose.yml` and `config.yaml` and makes changes to any relevant settings (passwords, usernames, etc...). Ensure that any settings used in both files (EX mariaDB passwords) match.
+
+To build and start CM:
+
+```bash
+docker-compose up -d
+```
+
+To include Grafana/Influx dependencies run:
+
+```bash
+docker-compose --profile full up -d
+```
+
 ## Locally
 
 Requirements:
@@ -57,7 +88,7 @@ npm install
 tsc -p .
 ```
 
-An example of running CM using the [minimum configuration](/docs/operator/configuration.md#minimum-config) with a [configuration file](/docs/operator/configuration.md#file-configuration-recommended):
+An example of running CM using the [minimum configuration](configuration.md#minimum-config) with a [configuration file](configuration.md#file-configuration-recommended):
 
 ```bash
 node src/index.js run
