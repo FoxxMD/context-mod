@@ -9,6 +9,7 @@ gem "just-the-docs", "0.4.0.rc3" # currently the latest pre-release
 gem "jekyll-readme-index"
 gem 'jekyll-default-layout'
 gem 'jekyll-titles-from-headings'
+gem 'jekyll-relative-links'
 
 group :jekyll_plugins do
   gem 'jekyll-optional-front-matter'
