@@ -1,3 +1,10 @@
+---
+parent: Operator
+nav_order: 4
+---
+
+# Adding A Bot
+
 # Table of Contents
 
 * [What is a Bot?](#what-is-a-bot)

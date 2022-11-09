@@ -1,4 +1,11 @@
-This getting started guide is for **Operators** -- that is, someone who wants to run the actual software for a ContentMod bot. If you are a **Moderator** check out the [moderator getting started](/docs/subreddit/gettingStarted.md) guide instead.
+---
+parent: Operator
+nav_order: 1
+---
+
+# Getting Started
+
+This getting started guide is for **Operators** -- that is, someone who wants to run the actual software for a ContentMod bot. If you are a **Moderator** check out the [moderator getting started](/docs/moderators/gettingStarted.md) guide instead.
 
 # Table of Contents
 
@@ -49,6 +56,6 @@ To monitor the behavior of bots running on your instance visit http://localhost:
 
 As an operator you should familiarize yourself with how the [operator configuration](/docs/operator/configuration.md) you made works. This will help you understand how to get the most of your CM instance by leveraging the [Cache](/docs/oeprator/caching.md) and [Database](/docs/operator/database.md) effectively as well as provide you will all possible options for configuring CM using the [schema.](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
 
-If you are also the moderator of the subreddit the bot will be running you should check out the [moderator getting started guide.](/docs/subreddit/gettingStarted.md#setup-wiki-page)
+If you are also the moderator of the subreddit the bot will be running you should check out the [moderator getting started guide.](/docs/moderators/gettingStarted.md#setup-wiki-page)
 
 You might also be interested in these [quick tips for using the web interface](/docs/webInterface.md). Additionally, on the dashboard click the **Help** button at the top of the page to get a guided tour of the dashboard.

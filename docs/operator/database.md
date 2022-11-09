@@ -1,3 +1,9 @@
+---
+parent: Operator
+---
+
+# Database
+
 # Overview
 
 CM uses a database to store three types of data:

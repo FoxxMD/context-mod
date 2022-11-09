@@ -1,3 +1,10 @@
+---
+parent: Operator
+nav_order: 3
+---
+
+# Configuration
+
 The **Operator** configuration refers to configuration used configure to the actual application/bot. This is different
 from the **Subreddit** configuration that is defined in each Subreddit's wiki and determines the rules/actions for
 activities the Bot runs on.

@@ -1,4 +1,9 @@
-# Operator Guide
+---
+has_children: true
+nav_order: 3
+---
+
+# Operator
 
 An **Operator** is the user **running the ContextMod software.**
 

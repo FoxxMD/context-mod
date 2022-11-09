@@ -1,3 +1,9 @@
+---
+nav_order: 5
+---
+
+# Web Interface
+
 ## Editing/Updating Your Config
 
 * Open the editor for your subreddit

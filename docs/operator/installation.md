@@ -1,3 +1,8 @@
+---
+parent: Operator
+nav_order: 2
+---
+
 # Installation
 
 In order to run a ContextMod instance you must first you must install it somewhere.
