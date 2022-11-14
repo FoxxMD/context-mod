@@ -8,6 +8,9 @@ url: https://contextmod.dev
 
 color_scheme: dark
 
+mermaid:
+  version: "9.1.3"
+
 aux_links:
   Github: https://github.com/foxxmd/context-mod
 
