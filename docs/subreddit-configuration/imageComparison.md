@@ -7,7 +7,7 @@ parent: Subreddit Configuration
 
 ContextMod supports comparing image content, for the purpose of detecting duplicates, with two different but complimentary systems. Image comparison behavior is available for the following rules:
 
-* [Recent Activity](/docs/moderators/components/recentActivity)
+* [Recent Activity](in-depth/recentActivity)
 * Repeat Activity (In-progress)
 
 To enable comparisons reference the example below (at the top-level of your rule) and configure as needed:
@@ -44,6 +44,7 @@ YAML
 ```yaml
 name: ruleWithImageDetection
 kind: recentActivity
+imageDetection:
   enable: true
   threshold: 5
   fetchBehavior: extension

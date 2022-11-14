@@ -17,7 +17,7 @@ If the type is **Check** or **Run** the recipe contents will have instructions i
 
 ### As Config Fragment
 
-**Checks, Runs, Actions, and Rule** recipes can be referenced in your config without copy-pasting by using them as [Config Fragments.](/docs/moderators/components/README.md#partial-configurations) These need to be placed in the correct spot in your config, just like copy-pasting, but only require the URL of the recipe instead of all the code.
+**Checks, Runs, Actions, and Rule** recipes can be referenced in your config without copy-pasting by using them as [Config Fragments.](../README.md#partial-configurations) These need to be placed in the correct spot in your config, just like copy-pasting, but only require the URL of the recipe instead of all the code.
 
 To use a recipe as a fragment **copy** the URL of the config and insert into your config like this:
 
@@ -51,42 +51,42 @@ runs:
 ### Remove submissions from users who have used 'freekarma' subs to bypass karma checks
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/freekarma.yaml)
+* [Config](freekarma.yaml)
 
 If the user has any activity (comment/submission) in known freekarma subreddits in the past (100 activities) then remove the submission.
 
 ### Remove submissions that are consecutively spammed by the author
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/crosspostSpam.yaml)
+* [Config](crosspostSpam.yaml)
 
 If the user has crossposted the same submission in the past (100 activities) 4 or more times in a row then remove the submission.
 
 ### Remove submissions if users is flooding new
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/floodingNewSubmissions.yaml)
+* [Config](floodingNewSubmissions.yaml)
 
 If the user has made more than 4 submissions in your subreddit in the last 24 hours than new submissions are removed and user is tagged with a modnote.
 
 ### Remove submissions posted in diametrically-opposed subreddit
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/diametricSpam.yaml)
+* [Config](diametricSpam.yaml)
 
 If the user makes the same submission to another subreddit(s) that are "thematically" opposed to your subreddit it is probably spam. This check removes it. Detects all types of submissions (including images).
 
 ### Remove comments that are consecutively spammed by the author
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/commentSpam.yaml)
+* [Config](commentSpam.yaml)
 
 If the user made the same comment (with some fuzzy matching) 4 or more times in a row in the past (100 activities or 6 months) then remove the comment.
 
 ### Remove comment if it is a chat invite link spam
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/chatSpam.yaml)
+* [Config](chatSpam.yaml)
 
 This rule goes a step further than automod can by being more discretionary about how it handles this type of spam.
 
@@ -105,7 +105,7 @@ This way ContextMod can more easily distinguish between these use cases for a us
 ### Remove comments reposted from youtube video submissions
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/youtubeCommentRepost.yaml)
+* [Config](youtubeCommentRepost.yaml)
 
 **Requires bot has an API Key for Youtube.**
 
@@ -114,7 +114,7 @@ Removes comment on reddit if the same comment is found on the youtube video the 
 ### Remove comments reposted from reddit submissions
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/commentRepost.yaml)
+* [Config](commentRepost.yaml)
 
 Checks top-level comments on submissions younger than 30 minutes:
 * Finds other reddit submissions based on crosspost/duplicates/title/URL, takes top 10 submissions based # of upvotes
@@ -123,7 +123,7 @@ Checks top-level comments on submissions younger than 30 minutes:
 ### Remove reposted reddit submission
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/submissionRepost.yaml)
+* [Config](submissionRepost.yaml)
 
 Checks reddit for top posts with a **Title** that is 90% or more similar to the submission being checked and removes it, if found.
 
@@ -132,7 +132,7 @@ Checks reddit for top posts with a **Title** that is 90% or more similar to the 
 ### Remove link submissions where the user's history is comprised of 10% or more of the same link
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/selfPromo.yaml)
+* [Config](selfPromo.yaml)
 
 If the link origin (youtube author, twitter author, etc. or regular domain for non-media links)
 
@@ -144,7 +144,7 @@ then remove the submission
 ### Remove submissions posted in 'newtube' subreddits
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/newtube.yaml)
+* [Config](newtube.yaml)
 
 If the user makes the same submission to a 'newtube' or self-promotional subreddit it is removed and a modnote is added.
 
@@ -153,14 +153,14 @@ If the user makes the same submission to a 'newtube' or self-promotional subredd
 ### Remove comments on brigaded submissions when user has no history
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/brigadingNoHistory.yaml)
+* [Config](brigadingNoHistory.yaml)
 
 The users of comments on a brigaded submission (based on a special submission flair) have their comment history checked -- if they have no participation in your subreddit then the comment is removed.
 
 ### Remove submissions from users with a history of sex solicitation 
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/sexSolicitationHistory.yaml)
+* [Config](sexSolicitationHistory.yaml)
 
 If the author of a submission has submissions in their history that match common reddit "sex solicitation" tags (MFA, R4F, M4F, etc...) the submission is removed and a modnote added.
 
@@ -173,7 +173,7 @@ The check can be modified to removed comments by changing `kind: submission` to 
 ### Verify users from r/TranscribersOfReddit
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/transcribersOfReddit.yaml)
+* [Config](transcribersOfReddit.yaml)
 
 [r/TranscribersOfReddit](https://www.reddit.com/r/transcribersofreddit) is a community of volunteers transcribing images and videos, across reddit, into plain text.
 
@@ -182,14 +182,14 @@ This Check detects their standard transcription template and also checks they ha
 ### Require submission authors have prior subreddit participation
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/requireNonOPParticipation.yaml)
+* [Config](requireNonOPParticipation.yaml)
 
 Submission is removed if the author has **less than 5 non-OP comments** in your subreddit prior to making the submission.
 
 ### Require submission authors make a top-level comment with 15 minutes of posting
 
 * Type: **Check**
-* [Config](/docs/moderators/components/cookbook/requireNonOPParticipation.yaml)
+* [Config](requireNonOPParticipation.yaml)
 
 After making a submission the author must make a top-level comment with a regex-checkable pattern within X minutes. If the comment is not made the submission is removed.
 
@@ -198,7 +198,7 @@ After making a submission the author must make a top-level comment with a regex-
 ### Sticky a comment on popular submissions
 
 * Type: **Run**
-* [Config](/docs/moderators/components/cookbook/popularSubmissionMonitoring.yaml)
+* [Config](popularSubmissionMonitoring.yaml)
 
 This **Run** should come after any other Runs you have that may remove a Submission.
 

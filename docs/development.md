@@ -1,5 +1,5 @@
 ---
-nav_order: 6
+nav_order: 7
 ---
 
 # Development
@@ -10,9 +10,9 @@ TODO add more development sections...
 
 Use [act](https://github.com/nektos/act) to run Github actions locally.
 
-An example secrets file can be found in the project working directory at [act.env.example](act.env.example)
+An example secrets file can be found in the project working directory at [act.env.example](../act.env.example)
 
-Modify [push-hook-sample.json](.github/push-hook-sample.json) to point to the local branch you want to run a `push` event trigger on, then run this command from the project working directory:
+Modify [push-hook-sample.json](../.github/push-hook-sample.json) to point to the local branch you want to run a `push` event trigger on, then run this command from the project working directory:
 
 ```bash
 act -e .github/push-hook-sample.json --secret-file act.env

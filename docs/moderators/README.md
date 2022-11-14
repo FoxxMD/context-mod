@@ -1,7 +1,7 @@
 ---
 has_children: true
 title: Moderators
-nav_order: 2
+nav_order: 3
 ---
 
 This section is for **reddit moderators**. It covers how to use a CM bot for your subreddit.
