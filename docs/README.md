@@ -1,6 +1,6 @@
 ---
-title: Home
-nav_order: 1
+title: Overview
+nav_order: 2
 ---
 
 # Table of Contents
@@ -36,7 +36,7 @@ Where possible Context Mod (CM) uses the same terminology as, and emulates the b
 
 Expand the section below for a simplified flow diagram of how CM processes an incoming Activity. Then refer the text description of the diagram below as well as [Concepts](#Concepts) for descriptions of individual components.
 
-<details>
+<details markdown="block">
 <summary>Diagram</summary>
 
 ![Flow Diagram](images/diagram-highlevel.jpg)

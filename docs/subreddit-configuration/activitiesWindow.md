@@ -30,13 +30,13 @@ parent: Subreddit Configuration
 
 # Overview
 
-An **Activity Window** (`window`) is a group of properties that describe a **range** of [**Activities**](/docs/README.md#activity) to retrieve from Reddit and how to **filter** them.
+An **Activity Window** (`window`) is a group of properties that describe a **range** of [**Activities**](../README.md#activity) to retrieve from Reddit and how to **filter** them.
 
 The main components of an Activity Window:
 
 * **Range** -- How many Activities ([`count`](#count)) or what time period ([`duration`](#duration)) of Activities to fetch
 * **Type of Activities** -- When **fetching** from an Author's history, should it return overview (any Activities), just Submissions, or just Comments?
-* **Filters** -- How the retrieved Activities should be [filtered](/docs/moderators/components/README.md#filters) before returning them to a Rule
+* **Filters** -- How the retrieved Activities should be [filtered](README.md#filters) before returning them to a Rule
 
 
 As an example, if you want to run a **Recent Activity Rule** to check if a user has had activity in /r/mealtimevideos you also need to define what range of activities you want to look at from that user's history.
@@ -220,7 +220,7 @@ window:
 
 # Filters
 
-Activity Window can also specify [Item and Subreddit Filters](/docs/moderators/components/README.md#filters) to filter the Activities retrieved from Reddit before they are returned to a Rule.
+Activity Window can also specify [Item and Subreddit Filters](README.md#filters) to filter the Activities retrieved from Reddit before they are returned to a Rule.
 
 Activities can be filtered **during** (`pre`) retrieval or **after** (`post`) retrieval. **When**, during the window **lifecycle**, the Activities are filtered can change the set of Activities returned to a Rule drastically.
 
@@ -228,10 +228,10 @@ Activities can be filtered **during** (`pre`) retrieval or **after** (`post`) re
 
 Regardless of when you are filtering Activities the shape of the filter is the same. Filter properties:
 
-* `subreddits` -- A [Filter Shape](/docs/moderators/components/README.md#filter-shapes) for filtering by the [Subreddit Criteria](/docs/moderators/components/README.md#subreddit-filter) of each Activity
-* `submissionState` -- A [Filter Shape](/docs/moderators/components/README.md#filter-shapes) for [Submission Criteria](/docs/moderators/components/README.md#item-filter). Will run only if filtering a Submission.
-* `commentState` -- A [Filter Shape](/docs/moderators/components/README.md#filter-shapes) for [Comment Criteria](/docs/moderators/components/README.md#item-filter). Will run only if filtering a Comment.
-* `activityState` -- A [Filter Shape](/docs/moderators/components/README.md#filter-shapes) for either [Submission or Comment Criteria](/docs/moderators/components/README.md#item-filter). Will run only if `submissionState` or `commentState` is not defined for their respective Activity types.
+* `subreddits` -- A [Filter Shape](README.md#filter-shapes) for filtering by the [Subreddit Criteria](README.md#subreddit-filter) of each Activity
+* `submissionState` -- A [Filter Shape](README.md#filter-shapes) for [Submission Criteria](README.md#item-filter). Will run only if filtering a Submission.
+* `commentState` -- A [Filter Shape](README.md#filter-shapes) for [Comment Criteria](README.md#item-filter). Will run only if filtering a Comment.
+* `activityState` -- A [Filter Shape](README.md#filter-shapes) for either [Submission or Comment Criteria](README.md#item-filter). Will run only if `submissionState` or `commentState` is not defined for their respective Activity types.
 
 In this example the filter only returns Activities:
 

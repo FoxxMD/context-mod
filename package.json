@@ -21,7 +21,9 @@
     "circular-graph": "madge --image graph.svg --circular --extensions ts src/index.ts",
     "postinstall": "patch-package",
     "typeorm": "node --require ts-node/register ./node_modules/typeorm/cli.js",
-    "initMigration": "npm run typeorm -- migration:generate -t 1642180264563 -d ormconfig.js \"src/Common/Migrations/Database/init\""
+    "initMigration": "npm run typeorm -- migration:generate -t 1642180264563 -d ormconfig.js \"src/Common/Migrations/Database/init\"",
+    "docs-start": "bundle exec jekyll serve",
+    "docs-install": "bundle install"
   },
   "engines": {
     "node": ">=16"

@@ -92,7 +92,7 @@ If this fails for some reason you can create the wiki page through the web inter
 
 If neither of the above approaches work, or you do not wish to use the web interface, expand the section below for directions on how to manually setup the wiki page:
 
-<details>
+<details markdown="block">
 
 * Visit the wiki page of the subreddit you want the bot to moderate
   * The default location the bot checks for a configuration is at `https://old.reddit.com/r/YOURSUBERDDIT/wiki/botconfig/contextbot`
@@ -149,7 +149,7 @@ In the web interface each subreddit's tab has access to the built-in editor. Use
 
 ### Manually Saving
 
-<details>
+<details markdown="block">
 
 * Open the wiki page you created in the [wiki setup step](#setup-wiki-page) and click **edit**
   * Copy-paste your configuration into the wiki text box
