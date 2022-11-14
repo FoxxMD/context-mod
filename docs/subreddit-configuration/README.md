@@ -52,13 +52,6 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
     * [Toolbox UserNote](#usernote)
     * [Mod Note](#mod-note)
 * [Filters](#filters)
-  * [Filter Types](#filter-types)
-    * [Author Filter](#author-filter)
-      * [Mod Notes/Actions](#mod-actionsnotes-filter)
-      * [Toolbox UserNotes](#toolbox-usernotes-filter)
-    * [Item Filter](#item-filter)
-    * [Subreddit Filter](#subreddit-filter)
-  * [Named Filters](#named-filters)
 * [Common Patterns](#common-patterns)
   * [Conditions](#conditions)
   * [Activities `window`](#activities-window)
@@ -330,7 +323,7 @@ The above can also be expressed as a percentage of all activities found, instead
 
 The search can also be modified in a number of ways:
 
-* Filter found activities using an [Item Filter](#item-filter)
+* Filter found activities using an [Item Filter](in-depth/filters#item-filter)
 * Only return activities that match the Activity from the Event being processed
   * Using [image detection](imageComparison.md) (pixel or perceptual hash matching)
 * Only return certain types of activities (only submission or only comments)
@@ -364,7 +357,7 @@ The **History** rule can check an Author's submission/comment statistics over a 
 
 [**Full Documentation**](in-depth/author)
 
-The **Author** rule behaves the same as the [Author Filter](#author-filter). It can be used when you want to test Author state alongside other rules to create more complex behavior than would be possible by only applying to individual Rules or an entire check.
+The **Author** rule behaves the same as the [Author Filter](in-depth/filters#author-filter). It can be used when you want to test Author state alongside other rules to create more complex behavior than would be possible by only applying to individual Rules or an entire check.
 
 ### Regex
 
@@ -439,7 +432,7 @@ Actions are performed in the order they are listed in the **Check.**
 
 ## Named Actions
 
-**Named Actions** work the same as [**Named Rules**](#named-rules) and [**Named Filters:**](#named-filters)
+**Named Actions** work the same as [**Named Rules**](#named-rules) and [**Named Filters:**](in-depth/filters#named-filters)
 
 Actions may be given a `name`. If an Action is named it can **re-used anywhere in the configuration regardless of location.** This is done by:
 
@@ -743,7 +736,7 @@ actions:
 Remove the Activity being processed. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FRemoveActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 
 * **note** can be [templated](#templating)
-* **reasonId** IDs can be found in the [editor](../webInterface.md) using the **Removal Reasons** popup
+* **reasonId** IDs can be found in the [editor](../../webInterface.md) using the **Removal Reasons** popup
 
 If neither note nor reasonId are included then no removal reason is added.
 
@@ -815,133 +808,17 @@ actions:
 
 * **Runs, Checks, Rules, and Actions** can **all** have Filters
 * Filters test against the **current state** of the Activity (or it's Author) being processed, rather than looking at history/context/etc...
+  * CM supports filters for:
+    * [Author](in-depth/filters#author-filter) - age, verified email, profile description, flair...
+    * [Item (Submission/Comment)](in-depth/filters#item-filter) - sticked, # of reports, removed, flair, score...
+    * [Subreddit](in-depth/filters#subreddit-filter) - name, nsfw, quarantined...
+    * [Toolbox Usernotes](in-depth/filters#toolbox-usernotes-filter)
+    * [Mod Notes](in-depth/filters#mod-actionsnotes-filter)
 * Filter test results only determine if the Run, Check, Rule, or Action **should run** -- rather than triggering it
   * When the filter test **passes** the thing being tested continues to process as usual
   * When the filter test **fails** the thing being tested **fails**.
 
-A Filter has these properties:
-
-* `include` -- An optional list of Filter Criteria. If **any** passes the filter passes.
-* `exclude` -- An optional list of Filter Criteria. All **must NOT** pass for the filter to pass. Ignored if `include` is present.
-* `excludeCondition` -- A [condition](#conditions) that determines how the list of Filter Criteria are tested together
-
-## Filter Criteria
-
-A **criteria** is some property of a thing can be tested, and what the expected outcome is EX
-
-`age: '> 2 months'` => Author is older than 2 months
-
-**Filter Criteria** is one of more **criteria** combined together to form a set of criteria that must all be true together for the Filter Criteria to be true EX
-
-```yaml
-age: '> 2 months'
-verified: true
-```
-
-The above Filter Criteria is true if the Author's account is older than 2 months AND they have a verified email
-
-### Filter Shapes
-
-Generically, a "full" Filter looks like this:
-
-```yaml
-include: #optional
-  - name: AFilterCriteria
-    criteria:
-      ...
-  ... #one or more filter criteria
-
-exclude: #optional
-  ... # one or more filter criteria
-
-excludeCondition: OR or AND
-```
-
-But for convenience a Filter's shape can be simplified with a few assumptions
-
-#### Simple Object
-
-When a Filter is an object, the object is assumed to be a Filter Criteria which is used in `include`
-
-```yaml
-itemIs:
-  approved: false
-```
-
-#### Simple List
-
-When a Filter is a list, the list is assumed to be a list of Filter Criteria and used in `include`
-
-```yaml
-itemIs:
-  - approved: false
-    filtered: false
-  - is_self: true
-```
-
-## Filter Types
-
-There are two types of Filter. Both types have the same "shape" in the configuration with the differences between them being:
-
-* what they are testing on
-* what criteria are available to test
-
-### Author Filter
-
-Test the Author of an Activity. See [Schema documentation](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json) for all possible Author Criteria
-
-#### Mod Actions/Notes Filter
-
-See [Mod Actions/Notes](in-depth/modActions/README.md#mod-action-filter) documentation.
-
-#### Toolbox UserNotes Filter
-
-See [UserNotes](in-depth/userNotes/README.md) documentation
-
-### Item Filter
-
-Test for properties of an Activity:
-
-* [Comment Criteria](https://json-schema.app/view/%23%2Fdefinitions%2FCommentState?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
-* [Submission Criteria](https://json-schema.app/view/%23%2Fdefinitions%2FSubmissionState?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
-
-### Subreddit Filter
-
-Test for properties of the Subreddit an Activity belongs to. See [Schema documentation](https://json-schema.app/view/%23%2Fdefinitions%2FSubredditCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
-
-## Named Filters
-
-**Named Filters** work the same as [**Named Rules**](#named-rules) and [**Named Actions:**](#named-actions)
-
-**Filter Criteria** may be given a `name`. A named **Filter Criteria** can **re-used anywhere in the configuration regardless of location.** This is done by:
-
-* specifying a name on a **Filter Criteria** **once** EX: `name: MyFitlerCriteria`
-* using the Filter Criteria's name in place of a Filter Criteria object
-
-```yaml
-runs:
-  - name: MyFirstRun
-    checks:
-      - name: MyFirstCheck
-        kind: submission
-        itemIs:
-          - MyFilterCriteria
-        rules:
-          ...
-        actions:
-          ...
-      - name: MySecondCheck
-        kind: submission
-        itemIs:
-          include:
-            - name: MyFilterCriteria
-              criteria:
-                approved: false
-        rules:
-          ...
-        actions:
-          ...
-```
+[**Refer to the full Filter documentation for more**](in-depth/filters)
 
 # Common Patterns
 
@@ -1043,7 +920,7 @@ Some criteria accept an optional **duration** to compare against:
 
 The duration value compares a time range from **now** to `duration value` time in the past.
 
-Refer to [duration values in activity window documentation](activitiesWindow.md#duration-values) as well as the individual rule/criteria schema to see what this duration is comparing against.
+Refer to [duration values in activity window documentation](activitiesWindow.md#duration) as well as the individual rule/criteria schema to see what this duration is comparing against.
 
 ## Filter Defaults
 
