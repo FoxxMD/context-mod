@@ -65,7 +65,7 @@ Content-Length: 155
 }
 ```
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -101,7 +101,7 @@ The lifecycle of a mock call I do:
 
 #### All Responses return 403
 
-<details>
+<details markdown="block">
 <summary>HTTP</summary>
 
 ```HTTP
@@ -184,7 +184,7 @@ Content-Length: 1757
 
 </details>
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -266,7 +266,7 @@ curl --location --request PUT 'http://localhost:8010/mockserver/expectation' \
 
 #### All Responses Timeout
 
-<details>
+<details markdown="block">
 <summary>HTTP</summary>
 
 ```HTTP
@@ -293,7 +293,7 @@ Content-Length: 251
 
 </details>
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -319,7 +319,7 @@ curl --location --request PUT 'http://localhost:8010/mockserver/expectation' \
 
 #### All Responses Drop After Delay (Connection Closed by Server)
 
-<details>
+<details markdown="block">
 <summary>HTTP</summary>
 
 ```HTTP
@@ -346,7 +346,7 @@ Content-Length: 234
 
 </details>
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -384,7 +384,7 @@ Content-Length: 26
 }
 ```
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash

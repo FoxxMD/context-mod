@@ -36,7 +36,7 @@ Facets are specified in the `searchOn` array property within the rule's configur
 
 Specify one or more types of facets as a string to use their default configurations
 
-<details>
+<details markdown="block">
 
 YAML
 ```yaml
@@ -69,7 +69,7 @@ JSON
 
 **string** and object configurations can be mixed
 
-<details>
+<details markdown="block">
 
 ```yaml
 kind: repost
@@ -155,7 +155,7 @@ Define a set of criteria to test against the **number of reposts**, **time repos
 
 ##### Count
 
-<details>
+<details markdown="block">
 
 ```yaml
 kind: repost
@@ -205,7 +205,7 @@ criteria:
 
 Define a test or array of tests to run against **when reposts were created**
 
-<details>
+<details markdown="block">
 
 ```yaml
 kind: repost
@@ -300,7 +300,7 @@ This is the same behavior described in the [TLDR](#TLDR) section above -- find a
   * any crossposts/duplicates
   * any submissions with the exact URL
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -358,7 +358,7 @@ Find any submissions with:
 
 * a very similar title (85% or more the same)
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -425,7 +425,7 @@ checks:
 
 * a very similar title (95% or more the same)
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -495,7 +495,7 @@ checks:
 
 ### Search by Title, specify similarity percentage, AND any duplicates
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -567,7 +567,7 @@ checks:
 
 ### Approve Submission if not reposted in the last month, by title
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -687,7 +687,7 @@ FINALLY
 * filter all gathered comments by default `matchScore: 85` to find very similar matches
 * rules is triggered if any are found
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -741,7 +741,7 @@ checks:
 
 ### Search by external (youtube) comments only
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -806,7 +806,7 @@ checks:
 
 ### Search by external (youtube) comments only, with higher comment match percentage
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:
@@ -873,7 +873,7 @@ checks:
 
 ### Search by external (youtube) comments and submission URL, with higher comment match percentage
 
-<details>
+<details markdown="block">
 
 ```yaml
 polling:

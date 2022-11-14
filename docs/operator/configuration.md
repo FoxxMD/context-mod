@@ -86,7 +86,7 @@ node src/index.js run
 
 Run `node src/index.js run help` to get a list of available command line options (denoted by **ARG** above):
 
-<details>
+<details markdown="block">
 
 ```
 Usage: index [options] [command]
@@ -173,7 +173,7 @@ Minimum information required for a valid bot:
 * Refresh Token
 * Access Token
 
-<details>
+<details markdown="block">
 <summary>Example</summary>
 
 ```yaml
@@ -218,7 +218,7 @@ Below are examples of the minimum required config to run the application using a
 
 Using **FILE**
 
-<details>
+<details markdown="block">
 
 See [Specify File Location](#specify-file-location) for where this file would be located.
 
@@ -255,7 +255,7 @@ JSON (`config.json5`)
 
 Using **ENV** (`.env`)
 
-<details>
+<details markdown="block">
 
 ```
 OPERATOR=YourRedditUsername
@@ -268,7 +268,7 @@ REDIRECT_URI=http://localhost:8085/callback
 
 Using **ARG**
 
-<details>
+<details markdown="block">
 
 ```
 node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --redirectUri=http://localhost:8085/callback
@@ -282,7 +282,7 @@ An example of using multiple configuration levels together IE all are provided t
 
 **FILE**
 
-<details>
+<details markdown="block">
 
 ```json
 {
@@ -303,7 +303,7 @@ logging:
 
 **ENV** (`.env`)
 
-<details>
+<details markdown="block">
 
 ```
 CLIENT_SECRET=34v5q1c56ub
@@ -315,7 +315,7 @@ PORT=9008
 
 **ARG**
 
-<details>
+<details markdown="block">
 
 ```
 node src/index.js run --subreddits=sub1 --clientId=34v5q1c56ub
@@ -337,7 +337,7 @@ log level: debug
 
 See the [Architecture Docs](erverClientArchitecture.md) for more information.
 
-<details>
+<details markdown="block">
 
 YAML
 

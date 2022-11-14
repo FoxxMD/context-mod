@@ -27,7 +27,7 @@ To use a recipe as a fragment **copy** the URL of the config and insert into you
 
 EXAMPLE: Using the **Config** link from the [Free Karma](#remove-submissions-from-users-who-have-used-freekarma-subs-to-bypass-karma-checks) check below -- copy the **Config** link and insert it into a full subreddit config like this:
 
-<details>
+<details markdown="block">
 <summary>Config</summary>
 
 ```yaml
