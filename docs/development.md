@@ -4,7 +4,25 @@ nav_order: 7
 
 # Development
 
-TODO add more development sections...
+# Serving Docs Locally
+
+Requirements:
+
+* [Jeykll](https://jekyllrb.com/) installed
+  * Ruby 2.5.0 or higher and [RubyGems](https://rubygems.org/pages/download) (usually bundled)
+* [Bundler](https://bundler.io/) installed
+
+## Install Doc Dependencies
+
+```bash
+npm run docs-install
+```
+
+## Serve Docs
+
+```bash
+npm run docs-start
+```
 
 # Developing/Testing Github Actions
 
