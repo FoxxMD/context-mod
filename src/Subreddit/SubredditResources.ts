@@ -556,11 +556,14 @@ export class SubredditResources {
 
         this.logger.debug(`Marked ${activityIdsToDelete.length} Activities created, by Delayed, for deletion (${rawActCount} w/o Events | ${activeActCount} used by other Delayed Activities)`, {leaf: 'Delayed Activities'});
 
-        await this.dispatchedActivityRepo.delete(actualDispatchedIds);
+        if(actualDispatchedIds.length > 0) {
+            await this.dispatchedActivityRepo.delete(actualDispatchedIds);
+        } else {
+            this.logger.warn('No dispatched ids found to delete');
+        }
         if(activityIdsToDelete.length > 0) {
             await this.activityRepo.delete(activityIdsToDelete);
         }
-
         this.delayedItems = this.delayedItems.filter(x => !actualDispatchedIds.includes(x.id));
     }
 
