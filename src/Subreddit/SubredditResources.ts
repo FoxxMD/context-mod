@@ -515,7 +515,7 @@ export class SubredditResources {
                 acc.add(curr.activity.id);
             }
             if(curr.activity.submission !== undefined && curr.activity.submission !== null) {
-                if(curr.activity.actionedEvents === null || curr.activity.submission.actionedEvents.length === 0) {
+                if(curr.activity.submission.actionedEvents === null || curr.activity.submission.actionedEvents.length === 0) {
                     acc.add(curr.activity.submission.id);
                 }
             }
