@@ -1717,6 +1717,23 @@ export const fileOrDirectoryIsWriteable = (location: string) => {
     }
 }
 
+export const fileOrDirectoryExists = async (path: string) => {
+    const pathInfo = pathUtil.parse(path);
+    const isDir = pathInfo.ext === '';
+    try {
+        await promises.access(path, constants.R_OK);
+        return true;
+    } catch (err: any) {
+        const {code} = err;
+        if (code === 'ENOENT') {
+            return false;
+        } else if (code === 'EACCES') {
+            throw new SimpleError(`${isDir ? 'Directory' : 'File'} may exist at ${path} but application does not have permission to write to it.`);
+        }
+        throw new ErrorWithCause(`Unable to determine if ${isDir ? 'directory' : 'file'} exists at ${path} because application is unable to access the parent directory due to a system error`, {cause: err});
+    }
+}
+
 export const overwriteMerge = (destinationArray: any[], sourceArray: any[], options: any): any[] => sourceArray;
 
 export const removeUndefinedKeys = <T extends Record<string, any>>(obj: T): T | undefined => {

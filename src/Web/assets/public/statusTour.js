@@ -6,8 +6,8 @@ steps = [
         intro: `
 <div class="space-y-3"><div>The dashboard allows you to monitor and configure your Bot's behavior for each Subreddit it runs on.</div>
         <ul class="list-inside list-disc">
-        <li><a href="https://github.com/FoxxMD/context-mod/blob/master/docs/webInterface.md" target="_blank">Dashboard Tips</a></li>
-        <li><a href="https://github.com/FoxxMD/context-mod/tree/master/docs/subreddit/components" target="_blank">Config Docs</a></li>
+        <li><a href="/docs/webInterface.html" target="_blank">Dashboard Tips</a></li>
+        <li><a href="/docs/subreddit-configuration" target="_blank">Config Docs</a></li>
         <li><a href="https://github.com/FoxxMD/context-mod/issues" target="_blank">Report Issue</a></li>
         <li><a href="https://www.reddit.com/r/ContextModBot/" target="_blank">CM Subreddit</a></li>
         <li><a href="https://discord.gg/YgehbC8pXW" target="_blank">CM Discord</a></li>

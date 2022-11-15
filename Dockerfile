@@ -115,6 +115,16 @@ RUN npm install --production \
     && rm -rf node_modules/ts-node \
     && rm -rf node_modules/typescript
 
+# https://github.com/sass/sassc-ruby/issues/189#issuecomment-629758948
+# sassc is very slow to compile bc there are no alpine binaries
+RUN apk add --no-cache --virtual .build-deps \
+    make gcc g++ ruby-bundler ruby-dev \
+    && gem install bundler:2.3.9 \
+    && bundle install \
+    && bundle exec jekyll build -b /docs \
+    && apk del .build-deps \
+    && rm -rf docs
+
 ENV NPM_CONFIG_LOGLEVEL debug
 
 # can set database to use more performant better-sqlite3 since we control everything
