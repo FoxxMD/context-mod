@@ -96,10 +96,25 @@ WORKDIR /app
 
 FROM base as build
 
+# copy NPM dependencies and install
 COPY --chown=abc:abc package*.json ./
 COPY --chown=abc:abc tsconfig.json .
 
 RUN npm install
+
+# copy bundle/jekyll dependencies and docs folder
+COPY --chown=abc:abc Gemfile Gemfile.lock _config.yml ./
+COPY --chown=abc:abc docs ./docs/
+
+# sassc (a jekll dependency) is very slow to compile bc there are no alpine binaries
+# https://github.com/sass/sassc-ruby/issues/189#issuecomment-629758948
+# so for now sync used jekyll version with prebuilt binary available in alpine repo
+RUN apk add --no-cache --virtual .build-deps \
+    ruby-jekyll \
+    && bundle install \
+    && jekyll build -b /docs \
+    && apk del .build-deps \
+    && rm -rf docs
 
 COPY --chown=abc:abc . /app
 
@@ -114,16 +129,6 @@ RUN npm install --production \
     && chown abc:abc node_modules \
     && rm -rf node_modules/ts-node \
     && rm -rf node_modules/typescript
-
-# https://github.com/sass/sassc-ruby/issues/189#issuecomment-629758948
-# sassc is very slow to compile bc there are no alpine binaries
-RUN apk add --no-cache --virtual .build-deps \
-    make gcc g++ ruby-bundler ruby-dev \
-    && gem install bundler:2.3.9 \
-    && bundle install \
-    && bundle exec jekyll build -b /docs \
-    && apk del .build-deps \
-    && rm -rf docs
 
 ENV NPM_CONFIG_LOGLEVEL debug
 
