@@ -511,11 +511,11 @@ export class SubredditResources {
         // get potential activities to delete
         // but only include activities that don't have any actionedEvents
         let activityIdsToDelete = Array.from(dispatched.reduce((acc, curr) => {
-            if(curr.activity.actionedEvents.length === 0) {
+            if(curr.activity.actionedEvents === null || curr.activity.actionedEvents.length === 0) {
                 acc.add(curr.activity.id);
             }
             if(curr.activity.submission !== undefined && curr.activity.submission !== null) {
-                if(curr.activity.submission.actionedEvents.length === 0) {
+                if(curr.activity.actionedEvents === null || curr.activity.submission.actionedEvents.length === 0) {
                     acc.add(curr.activity.submission.id);
                 }
             }
