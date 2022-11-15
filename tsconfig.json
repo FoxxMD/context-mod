@@ -18,6 +18,7 @@
   "exclude": [
     "node_modules",
     "coverage",
-    "tests/*.ts"
+    "tests/*.ts",
+    "_site"
   ]
 }
