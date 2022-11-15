@@ -1,3 +1,8 @@
+---
+parent: Operator
+nav_order: 2
+---
+
 # Installation
 
 In order to run a ContextMod instance you must first you must install it somewhere.
@@ -13,7 +18,7 @@ Images available from these registeries:
 * [Dockerhub](https://hub.docker.com/r/foxxmd/context-mod) - `docker.io/foxxmd/context-mod`
 * [GHCR](https://github.com/foxxmd/context-mod/pkgs/container/context-mod) - `ghcr.io/foxxmd/context-mod`
 
-An example of starting the container using the [minimum configuration](/docs/operator/configuration.md#minimum-config):
+An example of starting the container using the [minimum configuration](configuration.md#minimum-config):
 
 * Bind the directory where your config file, logs, and database are located on your host machine into the container's default `DATA_DIR` by using `-v /host/path/folder:/config`
   * Note: **You must do this** or else your configuration will be lost next time your container is updated.
@@ -46,7 +51,7 @@ The included [`docker-compose.yml`](/docker-compose.yml) provides production-rea
 
 * [Redis](https://redis.io/) for caching
 * [MariaDB](https://mariadb.org/) for database
-* Optionally, [Influx/Grafana](/docs/operator/database.md#influx) instances
+* Optionally, [Influx/Grafana](database.md#influx) instances
 
 #### Setup
 
@@ -83,7 +88,7 @@ npm install
 tsc -p .
 ```
 
-An example of running CM using the [minimum configuration](/docs/operator/configuration.md#minimum-config) with a [configuration file](/docs/operator/configuration.md#file-configuration-recommended):
+An example of running CM using the [minimum configuration](configuration.md#minimum-config) with a [configuration file](configuration.md#file-configuration-recommended):
 
 ```bash
 node src/index.js run

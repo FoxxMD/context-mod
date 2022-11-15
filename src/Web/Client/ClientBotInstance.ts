@@ -6,6 +6,7 @@ import {
     NormalizedManagerResponse
 } from '../Common/interfaces';
 import {intersect, parseRedditEntity} from "../../util";
+import {CMError} from "../../Utils/Errors";
 
 export class ClientBotInstance implements BotInstance {
     instance: CMInstanceInterface;
@@ -37,8 +38,15 @@ export class ClientBotInstance implements BotInstance {
     }
 
     getAccessibleSubreddits(user: string, subreddits: string[] = []): string[] {
-        const normalSubs = subreddits.map(x => parseRedditEntity(x).name);
-        return Array.from(new Set([...this.getGuestSubreddits(user), ...intersect(normalSubs, this.getSubreddits())]));
+        try {
+            const normalSubs = subreddits.map(x => parseRedditEntity(x).name);
+            return Array.from(new Set([...this.getGuestSubreddits(user), ...intersect(normalSubs, this.getSubreddits())]));
+        } catch (err: any) {
+            throw new CMError(`Error occurred while trying to parse subreddits for user ${user}`, {
+                cause: err,
+                isSerious: true
+            });
+        }
     }
 
     getGuestManagers(user: string): NormalizedManagerResponse[] {

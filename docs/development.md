@@ -1,12 +1,36 @@
-TODO add more development sections...
+---
+nav_order: 7
+---
+
+# Development
+
+# Serving Docs Locally
+
+Requirements:
+
+* [Jeykll](https://jekyllrb.com/) installed
+  * Ruby 2.5.0 or higher and [RubyGems](https://rubygems.org/pages/download) (usually bundled)
+* [Bundler](https://bundler.io/) installed
+
+## Install Doc Dependencies
+
+```bash
+npm run docs-install
+```
+
+## Serve Docs
+
+```bash
+npm run docs-start
+```
 
 # Developing/Testing Github Actions
 
 Use [act](https://github.com/nektos/act) to run Github actions locally.
 
-An example secrets file can be found in the project working directory at [act.env.example](act.env.example)
+An example secrets file can be found in the project working directory at [act.env.example](../act.env.example)
 
-Modify [push-hook-sample.json](.github/push-hook-sample.json) to point to the local branch you want to run a `push` event trigger on, then run this command from the project working directory:
+Modify [push-hook-sample.json](../.github/push-hook-sample.json) to point to the local branch you want to run a `push` event trigger on, then run this command from the project working directory:
 
 ```bash
 act -e .github/push-hook-sample.json --secret-file act.env
@@ -28,7 +52,7 @@ Map port `1080:1080` -- acts as both the proxy port and the UI endpoint with the
 http(s)://localhost:1080/mockserver/dashboard
 ```
 
-In your [operator configuration](/docs/operator/operatorConfiguration.md) define a proxy for snoowrap at the top-level:
+In your [operator configuration](operator/configuration.md) define a proxy for snoowrap at the top-level:
 
 ```yaml
 snoowrap:
@@ -59,7 +83,7 @@ Content-Length: 155
 }
 ```
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -95,7 +119,7 @@ The lifecycle of a mock call I do:
 
 #### All Responses return 403
 
-<details>
+<details markdown="block">
 <summary>HTTP</summary>
 
 ```HTTP
@@ -178,7 +202,7 @@ Content-Length: 1757
 
 </details>
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -260,7 +284,7 @@ curl --location --request PUT 'http://localhost:8010/mockserver/expectation' \
 
 #### All Responses Timeout
 
-<details>
+<details markdown="block">
 <summary>HTTP</summary>
 
 ```HTTP
@@ -287,7 +311,7 @@ Content-Length: 251
 
 </details>
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -313,7 +337,7 @@ curl --location --request PUT 'http://localhost:8010/mockserver/expectation' \
 
 #### All Responses Drop After Delay (Connection Closed by Server)
 
-<details>
+<details markdown="block">
 <summary>HTTP</summary>
 
 ```HTTP
@@ -340,7 +364,7 @@ Content-Length: 234
 
 </details>
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash
@@ -378,7 +402,7 @@ Content-Length: 26
 }
 ```
 
-<details>
+<details markdown="block">
 <summary>CURL</summary>
 
 ```bash

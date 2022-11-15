@@ -1,9 +1,13 @@
+---
+title: Home
+nav_order: 1
+---
 # ContextMod [![Latest Release](https://img.shields.io/github/v/release/foxxmd/context-mod)](https://github.com/FoxxMD/context-mod/releases) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Docker Pulls](https://img.shields.io/docker/pulls/foxxmd/context-mod)](https://hub.docker.com/r/foxxmd/context-mod)
 
 <img src="/docs/logo.png" align="right"
 alt="ContextMod logo" width="180" height="176">
 
-**Context Mod** (CM) is an event-based, [reddit](https://reddit.com) moderation bot built on top of [snoowrap](https://github.com/not-an-aardvark/snoowrap) and written in [typescript](https://www.typescriptlang.org/).
+[**Context Mod**](https://contextmod.dev/) (CM) is an event-based, [reddit](https://reddit.com) moderation bot built on top of [snoowrap](https://github.com/not-an-aardvark/snoowrap) and written in [typescript](https://www.typescriptlang.org/).
 
 It is designed to help fill in the gaps for [automoderator](https://www.reddit.com/wiki/automoderator/full-documentation) in regard to more complex behavior with a focus on **user-history based moderation.**
 
@@ -16,27 +20,27 @@ An example of the above that Context Bot can do:
 
 Feature Highlights for **Moderators:**
 
-* Complete bot **autonomy**. YAML config is [stored in your subreddit's wiki](/docs/subreddit/gettingStarted.md#setup-wiki-page) (like automoderator)
+* Complete bot **autonomy**. YAML config is [stored in your subreddit's wiki](/docs/moderators/gettingStarted.md#setup-wiki-page) (like automoderator)
 * Simple rule-action behavior can be combined to create **complex behavior detection**
 * Support Activity filtering based on:
-  * [Author criteria](/docs/subreddit/components/README.md#author-filter) (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
-  * [Activity state](/docs/subreddit/components/README.md#item-filter) (removed, locked, distinguished, etc...)
-  * State of Subreddit Activity is in [Subreddit](/docs/subreddit/components/README.md#subreddit-filter) (nsfw, name, profile, etc...)
-* Rules and Actions support [named references](/docs/subreddit/components/README.md#named-rules) -- **write once, reference anywhere**
-* Powerful [logic control](/docs/subreddit/components/advancedConcepts/flowControl.md) (if, then, goto)
-* [Delay/re-process activities](/docs/subreddit/components/README.md#dispatch) using arbitrary rules
-* [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
-* [**Repost detection**](/docs/subreddit/components/repost) with support for external services (youtube, etc...)
+  * [Author criteria](docs/subreddit-configuration/README.md#author-filter) (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
+  * [Activity state](docs/subreddit-configuration/README.md#item-filter) (removed, locked, distinguished, etc...)
+  * State of Subreddit Activity is in [Subreddit](docs/subreddit-configuration/README.md#subreddit-filter) (nsfw, name, profile, etc...)
+* Rules and Actions support [named references](docs/subreddit-configuration/README.md#named-rules) -- **write once, reference anywhere**
+* Powerful [logic control](docs/subreddit-configuration/advancedConcepts/flowControl.md) (if, then, goto)
+* [Delay/re-process activities](docs/subreddit-configuration/README.md#dispatch) using arbitrary rules
+* [**Image Comparisons**](docs/subreddit-configuration/imageComparison.md) via fingerprinting and/or pixel differences
+* [**Repost detection**](docs/subreddit-configuration/in-depth/repost) with support for external services (youtube, etc...)
 * Event notification via Discord
 * [**Web interface**](#web-ui-and-screenshots) for monitoring, administration, and oauth bot authentication
-* [**Placeholders**](/docs/subreddit/actionTemplating.md) (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) templating
-* [**Partial Configurations**](/docs/subreddit/components/README.md#partial-configurations) -- offload parts of your configuration to shared locations to consolidate logic between multiple subreddits
-* [Guest Access](/docs/subreddit/README.md#guest-access) enables collaboration and easier setup by allowing temporary access
-* [Toxic content prediction](/docs/subreddit/components/README.md#moderatehatespeechcom-predictions) using [moderatehatespeech.com](https://moderatehatespeech.com) machine learning model
+* [**Placeholders**](docs/subreddit-configuration/actionTemplating.md) (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) templating
+* [**Partial Configurations**](docs/subreddit-configuration/README.md#partial-configurations) -- offload parts of your configuration to shared locations to consolidate logic between multiple subreddits
+* [Guest Access](docs/moderators/README.md#guest-access) enables collaboration and easier setup by allowing temporary access
+* [Toxic content prediction](docs/subreddit-configuration/README.md#moderatehatespeechcom-predictions) using [moderatehatespeech.com](https://moderatehatespeech.com) machine learning model
 
 Feature highlights for **Developers and Hosting (Operators):**
 
-* [Server/client architecture](/docs/serverClientArchitecture.md)
+* [Server/client architecture](/docs/operator/serverClientArchitecture.md)
   * Default/no configuration runs "All In One" behavior
   * Additional configuration allows web interface to connect to multiple servers
   * Each server instance can run multiple reddit accounts as bots
@@ -59,7 +63,7 @@ Feature highlights for **Developers and Hosting (Operators):**
 
 Each subreddit using the RCB bot configures its behavior via their own wiki page. 
 
-When a monitored **Activity** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of [**Checks**](/docs/subreddit/components/README.md#checks) to determine what to do with the **Activity** from that Event. Each **Check** consists of :
+When a monitored **Activity** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of [**Checks**](docs/subreddit-configuration/README.md#checks) to determine what to do with the **Activity** from that Event. Each **Check** consists of :
 
 #### Kind
 
@@ -67,11 +71,11 @@ Is this check for a submission or comment?
 
 #### Rules
 
-A list of [**Rules**](/docs/subreddit/components/README.md#rules) to run against the **Activity**. Triggered Rules can cause the whole Check to trigger and run its **Actions**
+A list of [**Rules**](docs/subreddit-configuration/README.md#rules) to run against the **Activity**. Triggered Rules can cause the whole Check to trigger and run its **Actions**
 
 #### Actions
 
-A list of [**Actions**](/docs/subreddit/components/README.md#actions) that describe what the bot should do with the **Activity** or **Author** of the activity (comment, remove, approve, etc.). The bot will run **all** Actions in this list.
+A list of [**Actions**](docs/subreddit-configuration/README.md#actions) that describe what the bot should do with the **Activity** or **Author** of the activity (comment, remove, approve, etc.). The bot will run **all** Actions in this list.
 
 ___
 
@@ -95,14 +99,14 @@ See the [Operator's Getting Started Guide](/docs/operator/gettingStarted.md)
 
 This guide is for **reddit moderators** who want to configure an existing CM bot to run on their subreddit.
 
-See the [Moderator's Getting Started Guide](/docs/subreddit/gettingStarted.md)
+See the [Moderator's Getting Started Guide](/docs/moderators/gettingStarted.md)
 
 ## Configuration and Documentation
 
 Context Bot's configuration can be written in YAML (like automoderator) or [JSON5](https://json5.org/). Its schema conforms to [JSON Schema Draft 7](https://json-schema.org/). Additionally, many **operator** settings can be passed via command line or environmental variables.
 
 * For **operators** (running the bot instance) see the [Operator Configuration](/docs/operator/configuration.md) guide
-* For **moderators** consult the [app schema and examples folder](/docs/README.md#configuration-and-usage)
+* For **moderators** consult the [Subreddit Configuration Docs](/docs/subreddit-configuration/README.md)
 
 [**Check the full docs for in-depth explanations of all concepts and examples**](/docs)
 

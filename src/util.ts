@@ -823,8 +823,11 @@ export const parseSubredditName = (val:string): string => {
     return matches[1] as string;
 }
 
-export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/|u_)*(?<name>[\w-]+)*\s*$/;
-export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/6bq1g';
+// https://www.reddit.com/r/help/comments/ubeg3s/why_are_there_subreddits_with_name_starting_with/
+export const REDDIT_SUBREDDIT_PLACEHOLDER: RegExp = /a:t5_\w+/;
+export const REDDIT_SUBREDDIT_PLACEHOLDER_URL = 'https://regexr.com/71tec';
+export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/|u_)*(?<name>[\w:-]+)*\s*$/;
+export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/71tdh';
 export const parseRedditEntity = (val:string, defaultUndefinedPrefix: RedditEntityType = 'subreddit'): RedditEntity => {
     if(val.trim().length === 0) {
         throw new Error('Entity name cannot be empty or only whitespace');
@@ -835,7 +838,10 @@ export const parseRedditEntity = (val:string, defaultUndefinedPrefix: RedditEnti
     }
     const groups = matches.groups as any;
     let eType: RedditEntityType;
-    if(groups.entityType === undefined || groups.entityType === null) {
+    // if we match a subreddit placeholder pattern for the name then ALWAYS type it as a subreddit
+    if(groups.name.match(REDDIT_SUBREDDIT_PLACEHOLDER) !== null) {
+        eType = 'subreddit';
+    } else if(groups.entityType === undefined || groups.entityType === null) {
         eType = defaultUndefinedPrefix;
     } else if(groups.entityType.includes('r')) {
         eType = 'subreddit';

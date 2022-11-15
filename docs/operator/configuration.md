@@ -1,3 +1,10 @@
+---
+parent: Operator
+nav_order: 3
+---
+
+# Configuration
+
 The **Operator** configuration refers to configuration used configure to the actual application/bot. This is different
 from the **Subreddit** configuration that is defined in each Subreddit's wiki and determines the rules/actions for
 activities the Bot runs on.
@@ -36,7 +43,7 @@ configuration.
 Using a file has many benefits over using ARG or ENV:
 
 * CM can automatically update your configuration
-* CM can automatically add bots via the [CM OAuth Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended)
+* CM can automatically add bots via the [CM OAuth Helper](addingBot.md#cm-oauth-helper-recommended)
 * CM has a built-in configuration editor that can help you build and validate your configuration file
 * File config is **required** if adding multiple bots to CM
 
@@ -44,8 +51,8 @@ Using a file has many benefits over using ARG or ENV:
 
 By default CM will look for `config.yaml` or `config.json` in the `DATA_DIR` directory:
 
-* [Local installation](/docs/operator/installation.md#locally) -- `DATA_DIR` is the root of your installation directory (same folder as `package.json`)
-* [Docker](/docs/operator/installation.md#docker-recommended) -- `DATA_DIR` is at `/config` in the container
+* [Local installation](installation.md#locally) -- `DATA_DIR` is the root of your installation directory (same folder as `package.json`)
+* [Docker](installation.md#docker-recommended) -- `DATA_DIR` is at `/config` in the container
 
 The `DATA_DIR` directory can be changed by passing `DATA_DIR` as an environmental variable EX `DATA_DIR=/path/to/directory`
 
@@ -65,7 +72,7 @@ One ContextMod instance can
 
 However, the default configuration (using **ENV/ARG**) assumes your intention is to run one bot (one reddit account) on one CM instance without these additional features. This is to make this mode of operation easier for users with this intention.
 
-To take advantage of this additional features you **must** use a **FILE** configuration. Learn about how this works and how to configure this scenario in the [Architecture Documentation.](/docs/serverClientArchitecture.md)
+To take advantage of this additional features you **must** use a **FILE** configuration. Learn about how this works and how to configure this scenario in the [Architecture Documentation.](serverClientArchitecture.md)
 
 ## CLI Usage
 
@@ -79,7 +86,7 @@ node src/index.js run
 
 Run `node src/index.js run help` to get a list of available command line options (denoted by **ARG** above):
 
-<details>
+<details markdown="block">
 
 ```
 Usage: index [options] [command]
@@ -124,11 +131,11 @@ Options:
 
 # Minimum Configuration
 
-The minimum configuration required to run CM assumes you have no bots and want to use CM to [add your first bot.](/docs/operator/addingBot.md#cm-oauth-helper-recommended)
+The minimum configuration required to run CM assumes you have no bots and want to use CM to [add your first bot.](addingBot.md#cm-oauth-helper-recommended)
 
 You will need have this information available:
 
-* From [provision a reddit client](/docs/operator/README.md#provisioning-a-reddit-client)
+* From [provision a reddit client](README.md#provisioning-a-reddit-client)
   * Client ID
   * Client Secret
   * Redirect URI (if different from default `http://localhost:8085/callback`)
@@ -153,7 +160,7 @@ Configured using the `bots` top-level property. Bot configuration can override a
 
 ## Adding A Bot
 
-If you use the [CM OAuth Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended) and it works successfully then the configuration for the Bot will be automatically added.
+If you use the [CM OAuth Helper](addingBot.md#cm-oauth-helper-recommended) and it works successfully then the configuration for the Bot will be automatically added.
 
 ### Manually Adding a Bot
 
@@ -166,7 +173,7 @@ Minimum information required for a valid bot:
 * Refresh Token
 * Access Token
 
-<details>
+<details markdown="block">
 <summary>Example</summary>
 
 ```yaml
@@ -211,7 +218,7 @@ Below are examples of the minimum required config to run the application using a
 
 Using **FILE**
 
-<details>
+<details markdown="block">
 
 See [Specify File Location](#specify-file-location) for where this file would be located.
 
@@ -248,7 +255,7 @@ JSON (`config.json5`)
 
 Using **ENV** (`.env`)
 
-<details>
+<details markdown="block">
 
 ```
 OPERATOR=YourRedditUsername
@@ -261,7 +268,7 @@ REDIRECT_URI=http://localhost:8085/callback
 
 Using **ARG**
 
-<details>
+<details markdown="block">
 
 ```
 node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --redirectUri=http://localhost:8085/callback
@@ -275,7 +282,7 @@ An example of using multiple configuration levels together IE all are provided t
 
 **FILE**
 
-<details>
+<details markdown="block">
 
 ```json
 {
@@ -296,7 +303,7 @@ logging:
 
 **ENV** (`.env`)
 
-<details>
+<details markdown="block">
 
 ```
 CLIENT_SECRET=34v5q1c56ub
@@ -308,7 +315,7 @@ PORT=9008
 
 **ARG**
 
-<details>
+<details markdown="block">
 
 ```
 node src/index.js run --subreddits=sub1 --clientId=34v5q1c56ub
@@ -328,9 +335,9 @@ log level: debug
 
 ## Configuring Client for Many Instances
 
-See the [Architecture Docs](/docs/serverClientArchitecture.md) for more information.
+See the [Architecture Docs](erverClientArchitecture.md) for more information.
 
-<details>
+<details markdown="block">
 
 YAML
 
@@ -401,8 +408,8 @@ JSON
 
 # Cache Configuration
 
-See the [Cache Configuration](/docs/operator/caching.md) documentation.
+See the [Cache Configuration](caching.md) documentation.
 
 # Database Configuration
 
-See the [Database Configuration](/docs/operator/database.md) documentation.
+See the [Database Configuration](database.md) documentation.
