@@ -17,12 +17,28 @@ import {
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData,
-    formatLogLineToHtml, filterLogs, getUserAgent,
-    intersect, isLogLineMinLevel,
-    LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
-    parseSubredditLogName, permissions,
-    randomId, replaceApplicationIdentifier, resultsSummary, sleep, triggeredIndicator, truncateStringToLength
+    defaultFormat,
+    filterLogBySubreddit,
+    filterCriteriaSummary,
+    formatFilterData,
+    formatLogLineToHtml,
+    filterLogs,
+    getUserAgent,
+    intersect,
+    isLogLineMinLevel,
+    LogEntry,
+    parseInstanceLogInfoName,
+    parseInstanceLogName,
+    parseRedditEntity,
+    parseSubredditLogName,
+    permissions,
+    randomId,
+    replaceApplicationIdentifier,
+    resultsSummary,
+    sleep,
+    triggeredIndicator,
+    truncateStringToLength,
+    fileOrDirectoryExists, resolvePath, fileOrDirectoryIsWriteable
 } from "../../util";
 import {Cache} from "cache-manager";
 import session, {Session, SessionData} from "express-session";
@@ -41,6 +57,9 @@ import {arrayMiddle, booleanMiddle} from "../Common/middleware";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
+import commandExists from 'command-exists';
+// @ts-ignore
+import promiseSpawn from '@npmcli/promise-spawn';
 import path from "path";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
@@ -63,8 +82,8 @@ import {
     CMInstanceInterface, HeartbeatResponse,
     InviteData, SubredditInviteDataPersisted
 } from "../Common/interfaces";
-import {open} from "fs/promises";
-import {createCacheManager} from "../../Common/Cache";
+import {open, rename, mkdir, copyFile} from "fs/promises";
+import {Logger} from "winston";
 
 const emitter = new EventEmitter();
 
@@ -104,6 +123,8 @@ app.set('view engine', 'ejs');
 app.use('/public', express.static(`${__dirname}/../assets/public`, staticOpts));
 app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`, staticOpts));
 app.use('/schemas', express.static(`${__dirname}/../../Schema/`, staticOpts));
+
+app.use('/docs', express.static(`${__dirname}/../../../_site/`, staticOpts));
 
 app.use((req, res, next) => {
     // https://developers.google.com/search/docs/advanced/crawling/block-indexing#http-response-header
@@ -151,6 +172,50 @@ const createToken = (bot: CMInstanceInterface, user?: Express.User | any, ) => {
     }, bot.secret, {
         expiresIn: '1m'
     });
+}
+
+const docsSetup = async (parentLogger: Logger) => {
+    const logger = parentLogger.child({leaf: 'Docs'});
+    const docIndexDir = resolvePath('../../../_site/index.html', __dirname);
+    const placeholderPath = resolvePath('../assets/nodocs.html', __dirname);
+    const docFullHintIndexDir = resolvePath('../../../_site/favicon.ico', __dirname);
+    const siteIndexDir = resolvePath('../../../_site', __dirname);
+    let siteWriteable = false;
+    try {
+        if(!(await fileOrDirectoryExists(docFullHintIndexDir))) {
+            logger.info('Site has not been generated! Will try to do this now.');
+            try {
+
+                siteWriteable = fileOrDirectoryIsWriteable(siteIndexDir);
+                try {
+                    await commandExists('bundle');
+                } catch (e) {
+                    throw new SimpleError(`Cannot generate because 'bundle' is not installed.`);
+                }
+                try {
+                    const res = await promiseSpawn('bundle', ['exec','jekyll','build', '-b', '/docs'], {
+                        cwd: resolvePath('../../../', __dirname),
+                    });
+                    logger.debug(res.stdout);
+                } catch (e) {
+                    throw new ErrorWithCause(`Error occurred while running 'bundle exec jekyll build'`, {cause: e});
+                }
+                logger.info('Docs built!');
+            } catch (e) {
+                // set up placeholder since docs did not exist and were not generated
+                logger.warn(new ErrorWithCause('Unable to generate docs site', {cause: e}));
+                if(siteWriteable && !(await fileOrDirectoryExists(docIndexDir))) {
+                    await mkdir(siteIndexDir);
+                    await copyFile(placeholderPath, docIndexDir);
+                }
+            }
+        } else {
+            logger.verbose('Docs are already generated.');
+        }
+    } catch (e) {
+        logger.warn('Unable to setup docs', {cause: e});
+        return;
+    }
 }
 
 const peekTrunc = truncateStringToLength(200);
@@ -204,6 +269,8 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
     const webOps = operators.map(x => x.toLowerCase());
 
     const logger = getLogger({defaultLabel: 'Web', ...options.logging}, 'Web');
+
+    await docsSetup(logger);
 
     logger.stream().on('log', (log: LogInfo) => {
         emitter.emit('log', log);
