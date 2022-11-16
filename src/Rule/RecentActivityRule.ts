@@ -126,28 +126,7 @@ export class RecentActivityRule extends Rule {
     async process(item: Submission | Comment): Promise<[boolean, RuleResult]> {
         let activities;
 
-        // ACID is a bitch
-        // reddit may not return the activity being checked in the author's recent history due to availability/consistency issues or *something*
-        // so make sure we add it in if config is checking the same type and it isn't included
-        // TODO refactor this for SubredditState everywhere branch
-        let shouldIncludeSelf = true;
         const strongWindow = windowConfigToWindowCriteria(this.window);
-        const {
-            filterOn: {
-                post: {
-                    subreddits: {
-                        include = [],
-                        exclude = []
-                    } = {},
-                } = {},
-            } = {}
-        } = strongWindow;
-        // typeof x === string -- a patch for now...technically this is all it supports but eventually will need to be able to do any SubredditState
-        if (include.length > 0 && !include.some(x => x.name !== undefined && x.name.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
-            shouldIncludeSelf = false;
-        } else if (exclude.length > 0 && exclude.some(x => x.name !== undefined && x.name.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
-            shouldIncludeSelf = false;
-        }
 
         if(strongWindow.fetch === undefined && this.lookAt !== undefined) {
             switch(this.lookAt) {
@@ -159,25 +138,10 @@ export class RecentActivityRule extends Rule {
             }
         }
 
-        activities = await this.resources.getAuthorActivities(item.author, strongWindow);
-
-        switch (strongWindow.fetch) {
-            case 'comment':
-                if (shouldIncludeSelf && item instanceof Comment && !activities.some(x => x.name === item.name)) {
-                    activities.unshift(item);
-                }
-                break;
-            case 'submission':
-                if (shouldIncludeSelf && item instanceof Submission && !activities.some(x => x.name === item.name)) {
-                    activities.unshift(item);
-                }
-                break;
-            default:
-                if (shouldIncludeSelf && !activities.some(x => x.name === item.name)) {
-                    activities.unshift(item);
-                }
-                break;
-        }
+        // ACID is a bitch
+        // reddit may not return the activity being checked in the author's recent history due to availability/consistency issues or *something*
+        // so add current activity as a prefetched activity and add it to the returned activities (after it goes through filtering)
+        activities = await this.resources.getAuthorActivities(item.author, strongWindow, undefined, [item]);
 
         let viableActivity = activities;
         // if config does not specify reference then we set the default based on whether the item is a submission or not
