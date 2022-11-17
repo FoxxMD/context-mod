@@ -1517,6 +1517,7 @@ export class SubredditResources {
             usernotes,
             ruleResults,
             actionResults,
+            author: (val) => this.getAuthor(val)
         });
     }
 

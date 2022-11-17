@@ -57,6 +57,29 @@ All Actions with `content` have access to this data:
 | `title`      | As comments => the body of the comment. As Submission => title                                      | Test post please ignore                                  |
 | `shortTitle` | The same as `title` but truncated to 15 characters                                                  | test post pleas...                                       |
 
+#### Common Author
+
+Additionally, `author` has these properties accessible:
+
+|      Name      |             Description             | Example  |
+|----------------|-------------------------------------|----------|
+| `age`          | (Approximate) Age of account        | 3 months |
+| `linkKarma`    | Amount of link karma                | 10       |
+| `commentKarma` | Amount of comment karma             | 3        |
+| `totalKarma`   | Combined link+comment karma         | 13       |
+| `verified`     | Does account have a verified email? | true     |
+
+NOTE: Accessing these properties may require an additional API call so use sparingly on high-volume comments
+
+##### Example Usage
+
+```
+The user {{item.author}} has been a redditor for {{item.author.age}}
+```
+Produces:
+
+> The user FoxxMD has been a redditor for 3 months
+
 ### Submissions
 
 If the **Activity** is a Submission these additional properties are accessible:
