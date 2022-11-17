@@ -46,7 +46,13 @@ import {RunStateType} from "../Common/Entities/RunStateType";
 import {QueueRunState} from "../Common/Entities/EntityRunState/QueueRunState";
 import {EventsRunState} from "../Common/Entities/EntityRunState/EventsRunState";
 import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState";
-import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
+import {
+    Invokee,
+    POLLING_COMMENTS, POLLING_MODQUEUE,
+    POLLING_SUBMISSIONS,
+    POLLING_UNMODERATED,
+    PollOn
+} from "../Common/Infrastructure/Atomic";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 import {snooLogWrapper} from "../Utils/loggerFactory";
 import {InfluxClient} from "../Common/Influx/InfluxClient";
@@ -558,9 +564,9 @@ class Bot implements BotInstanceFunctions {
 
     parseSharedStreams() {
 
-        const sharedCommentsSubreddits = !this.sharedStreams.includes('newComm') ? [] : this.subManagers.filter(x => x.isPollingShared('newComm')).map(x => x.subreddit.display_name);
+        const sharedCommentsSubreddits = !this.sharedStreams.includes(POLLING_COMMENTS) ? [] : this.subManagers.filter(x => x.isPollingShared(POLLING_COMMENTS)).map(x => x.subreddit.display_name);
         if (sharedCommentsSubreddits.length > 0) {
-            const stream = this.cacheManager.modStreams.get('newComm');
+            const stream = this.cacheManager.modStreams.get(POLLING_COMMENTS);
             if (stream === undefined || stream.subreddit !== sharedCommentsSubreddits.join('+')) {
                 let processed;
                 if (stream !== undefined) {
@@ -580,20 +586,20 @@ class Bot implements BotInstanceFunctions {
                     label: 'Shared Polling'
                 });
                 // @ts-ignore
-                defaultCommentStream.on('error', this.createSharedStreamErrorListener('newComm'));
-                defaultCommentStream.on('listing', this.createSharedStreamListingListener('newComm'));
-                this.cacheManager.modStreams.set('newComm', defaultCommentStream);
+                defaultCommentStream.on('error', this.createSharedStreamErrorListener(POLLING_COMMENTS));
+                defaultCommentStream.on('listing', this.createSharedStreamListingListener(POLLING_COMMENTS));
+                this.cacheManager.modStreams.set(POLLING_COMMENTS, defaultCommentStream);
             }
         } else {
-            const stream = this.cacheManager.modStreams.get('newComm');
+            const stream = this.cacheManager.modStreams.get(POLLING_COMMENTS);
             if (stream !== undefined) {
                 stream.end('Determined no managers are listening on shared stream parsing');
             }
         }
 
-        const sharedSubmissionsSubreddits = !this.sharedStreams.includes('newSub') ? [] : this.subManagers.filter(x => x.isPollingShared('newSub')).map(x => x.subreddit.display_name);
+        const sharedSubmissionsSubreddits = !this.sharedStreams.includes(POLLING_SUBMISSIONS) ? [] : this.subManagers.filter(x => x.isPollingShared(POLLING_SUBMISSIONS)).map(x => x.subreddit.display_name);
         if (sharedSubmissionsSubreddits.length > 0) {
-            const stream = this.cacheManager.modStreams.get('newSub');
+            const stream = this.cacheManager.modStreams.get(POLLING_SUBMISSIONS);
             if (stream === undefined || stream.subreddit !== sharedSubmissionsSubreddits.join('+')) {
                 let processed;
                 if (stream !== undefined) {
@@ -613,19 +619,19 @@ class Bot implements BotInstanceFunctions {
                     label: 'Shared Polling'
                 });
                 // @ts-ignore
-                defaultSubStream.on('error', this.createSharedStreamErrorListener('newSub'));
-                defaultSubStream.on('listing', this.createSharedStreamListingListener('newSub'));
-                this.cacheManager.modStreams.set('newSub', defaultSubStream);
+                defaultSubStream.on('error', this.createSharedStreamErrorListener(POLLING_SUBMISSIONS));
+                defaultSubStream.on('listing', this.createSharedStreamListingListener(POLLING_SUBMISSIONS));
+                this.cacheManager.modStreams.set(POLLING_SUBMISSIONS, defaultSubStream);
             }
         } else {
-            const stream = this.cacheManager.modStreams.get('newSub');
+            const stream = this.cacheManager.modStreams.get(POLLING_SUBMISSIONS);
             if (stream !== undefined) {
                 stream.end('Determined no managers are listening on shared stream parsing');
             }
         }
 
-        const isUnmoderatedShared = !this.sharedStreams.includes('unmoderated') ? false : this.subManagers.some(x => x.isPollingShared('unmoderated'));
-        const unmoderatedstream = this.cacheManager.modStreams.get('unmoderated');
+        const isUnmoderatedShared = !this.sharedStreams.includes(POLLING_UNMODERATED) ? false : this.subManagers.some(x => x.isPollingShared(POLLING_UNMODERATED));
+        const unmoderatedstream = this.cacheManager.modStreams.get(POLLING_UNMODERATED);
         if (isUnmoderatedShared && unmoderatedstream === undefined) {
             const defaultUnmoderatedStream = new UnmoderatedStream(this.client, {
                 subreddit: 'mod',
@@ -634,15 +640,15 @@ class Bot implements BotInstanceFunctions {
                 label: 'Shared Polling'
             });
             // @ts-ignore
-            defaultUnmoderatedStream.on('error', this.createSharedStreamErrorListener('unmoderated'));
-            defaultUnmoderatedStream.on('listing', this.createSharedStreamListingListener('unmoderated'));
-            this.cacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
+            defaultUnmoderatedStream.on('error', this.createSharedStreamErrorListener(POLLING_UNMODERATED));
+            defaultUnmoderatedStream.on('listing', this.createSharedStreamListingListener(POLLING_UNMODERATED));
+            this.cacheManager.modStreams.set(POLLING_UNMODERATED, defaultUnmoderatedStream);
         } else if (!isUnmoderatedShared && unmoderatedstream !== undefined) {
             unmoderatedstream.end('Determined no managers are listening on shared stream parsing');
         }
 
-        const isModqueueShared = !this.sharedStreams.includes('modqueue') ? false : this.subManagers.some(x => x.isPollingShared('modqueue'));
-        const modqueuestream = this.cacheManager.modStreams.get('modqueue');
+        const isModqueueShared = !this.sharedStreams.includes(POLLING_MODQUEUE) ? false : this.subManagers.some(x => x.isPollingShared(POLLING_MODQUEUE));
+        const modqueuestream = this.cacheManager.modStreams.get(POLLING_MODQUEUE);
         if (isModqueueShared && modqueuestream === undefined) {
             const defaultModqueueStream = new ModQueueStream(this.client, {
                 subreddit: 'mod',
@@ -651,9 +657,9 @@ class Bot implements BotInstanceFunctions {
                 label: 'Shared Polling'
             });
             // @ts-ignore
-            defaultModqueueStream.on('error', this.createSharedStreamErrorListener('modqueue'));
-            defaultModqueueStream.on('listing', this.createSharedStreamListingListener('modqueue'));
-            this.cacheManager.modStreams.set('modqueue', defaultModqueueStream);
+            defaultModqueueStream.on('error', this.createSharedStreamErrorListener(POLLING_MODQUEUE));
+            defaultModqueueStream.on('listing', this.createSharedStreamListingListener(POLLING_MODQUEUE));
+            this.cacheManager.modStreams.set(POLLING_MODQUEUE, defaultModqueueStream);
         } else if (isModqueueShared && modqueuestream !== undefined) {
             modqueuestream.end('Determined no managers are listening on shared stream parsing');
         }

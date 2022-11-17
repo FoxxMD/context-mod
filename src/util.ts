@@ -77,6 +77,7 @@ import {
     ImageHashCacheData,
     ModUserNoteLabel,
     modUserNoteLabels,
+    PollOn, pollOnTypeMapping, pollOnTypes,
     RedditEntity,
     RedditEntityType,
     RelativeDateTimeMatch,
@@ -3087,4 +3088,13 @@ export const toStrongSharingACLConfig = (data: SharingACLConfig | string[]): Str
     return {
         exclude: (data.exclude ?? []).map(x => parseStringToRegexOrLiteralSearch(x))
     }
+}
+
+export const toPollOn = (val: string | PollOn): PollOn => {
+    const clean = val.toLowerCase().trim();
+    const pVal = pollOnTypeMapping.get(clean);
+    if(pVal !== undefined) {
+        return pVal;
+    }
+    throw new SimpleError(`'${val}' is not a valid polling source. Valid sources: ${pollOnTypes.join(' | ')}`);
 }

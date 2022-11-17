@@ -372,7 +372,7 @@ export interface PollingOptions extends PollingDefaults {
      * * after they have been manually approved from modqueue
      *
      * */
-    pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
+    pollOn: PollOn
 }
 
 export interface TTLConfig {
