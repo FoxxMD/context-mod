@@ -572,7 +572,7 @@ class Bot implements BotInstanceFunctions {
                 if (stream !== undefined) {
                     this.logger.info('Restarting SHARED COMMENT STREAM due to a subreddit config change');
                     stream.end('Replacing with a new stream with updated subreddits');
-                    processed = stream.processed;
+                    processed = stream.processedBuffer;
                 }
                 if (sharedCommentsSubreddits.length > 100) {
                     this.logger.warn(`SHARED COMMENT STREAM => Reddit can only combine 100 subreddits for getting new Comments but this bot has ${sharedCommentsSubreddits.length}`);
@@ -605,7 +605,7 @@ class Bot implements BotInstanceFunctions {
                 if (stream !== undefined) {
                     this.logger.info('Restarting SHARED SUBMISSION STREAM due to a subreddit config change');
                     stream.end('Replacing with a new stream with updated subreddits');
-                    processed = stream.processed;
+                    processed = stream.processedBuffer;
                 }
                 if (sharedSubmissionsSubreddits.length > 100) {
                     this.logger.warn(`SHARED SUBMISSION STREAM => Reddit can only combine 100 subreddits for getting new Submissions but this bot has ${sharedSubmissionsSubreddits.length}`);

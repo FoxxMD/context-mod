@@ -7,6 +7,7 @@ import {mergeArr, parseDuration, random} from "../util";
 import { Logger } from "winston";
 import {ErrorWithCause} from "pony-cause";
 import dayjs, {Dayjs as DayjsObj} from "dayjs";
+import { FixedSizeList } from 'fixed-size-list'
 
 type Awaitable<T> = Promise<T> | T;
 
@@ -14,10 +15,12 @@ interface RCBPollingOptions<T> extends SnooStormOptions {
     subreddit: string,
     enforceContinuity?: boolean
     logger: Logger
+    sort?: string
     name?: string,
-    processed?: Set<T[keyof T]>
+    processed?: FixedSizeList<T[keyof T]>
     label?: string
     dateCutoff?: boolean
+    maxHistory?: number
 }
 
 interface RCBPollConfiguration<T> extends PollConfiguration<T>,RCBPollingOptions<T> {
@@ -40,6 +43,9 @@ export class SPoll<T extends RedditContent<object>> extends Poll<T> {
     name: string = 'Reddit Stream';
     logger: Logger;
     subreddit: string;
+    // using a fixed sized "regular" array means slightly more memory usage vs. a Set when holding N items
+    // BUT now we can limit N items to something reasonable instead of having a crazy big Set with all items seen since stream was started
+    processedBuffer: FixedSizeList<T[keyof T]>;
 
     constructor(options: RCBPollConfiguration<T>) {
         super(options);
@@ -54,6 +60,7 @@ export class SPoll<T extends RedditContent<object>> extends Poll<T> {
             label = 'Polling',
             processed,
             dateCutoff,
+            maxHistory = 300,
         } = options;
         this.subreddit = subreddit;
         this.name = name !== undefined ? name : this.name;
@@ -67,8 +74,10 @@ export class SPoll<T extends RedditContent<object>> extends Poll<T> {
         // if we pass in processed on init the intention is to "continue" from where the previous stream left off
         // WITHOUT new start behavior
         if (processed !== undefined) {
-            this.processed = processed;
+            this.processedBuffer = processed;
             this.newStart = false;
+        } else {
+            this.processedBuffer = new FixedSizeList<T[keyof T]>(maxHistory);
         }
 
         clearInterval(this.interval);
@@ -97,14 +106,14 @@ export class SPoll<T extends RedditContent<object>> extends Poll<T> {
                         }
                         for (const item of batch) {
                             const id = item[self.identifier];
-                            if (self.processed.has(id)) {
+                            if (self.processedBuffer.data.some(x => x === id)) {
                                 anyAlreadySeen = true;
                                 continue;
                             }
 
                             // add new item to list and set as processed
                             newItems.push(item);
-                            self.processed.add(id);
+                            self.processedBuffer.add(id);
                         }
                         page++;
                     }
