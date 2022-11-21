@@ -24,6 +24,9 @@ services:
 
   cache:
     image: 'redis:7-alpine'
+    volumes:
+      # on linux will need to make sure this directory has correct permissions for container to access
+      - './data/cache:/data'
 
   database:
     image: 'mariadb:10.9.3'

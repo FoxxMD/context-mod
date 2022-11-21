@@ -55,6 +55,8 @@ The included [`docker-compose.yml`](/docker-compose.yml) provides production-rea
 
 #### Setup
 
+The included `docker-compose.yml` file is written for **Docker Compose v2.**
+
 For new installations copy [`config.yaml`](/docker/config/docker-compose/config.yaml) into a folder named `data` in the same folder `docker-compose.yml` will be run from. For users migrating their existing CM instances to docker-compose, copy your existing `config.yaml` into the same `data` folder.
 
 Read through the comments in both `docker-compose.yml` and `config.yaml` and makes changes to any relevant settings (passwords, usernames, etc...). Ensure that any settings used in both files (EX mariaDB passwords) match.
@@ -62,13 +64,13 @@ Read through the comments in both `docker-compose.yml` and `config.yaml` and mak
 To build and start CM:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 To include Grafana/Influx dependencies run:
 
 ```bash
-docker-compose --profile full up -d
+docker compose --profile full up -d
 ```
 
 ## Locally
