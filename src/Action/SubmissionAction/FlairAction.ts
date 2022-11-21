@@ -30,15 +30,14 @@ export class FlairAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
         let flairParts = [];
-        if(this.text !== '') {
-            flairParts.push(`Text: ${this.text}`);
-        }
-        if(this.css !== '') {
-            flairParts.push(`CSS: ${this.css}`);
-        }
-        if(this.flair_template_id !== '') {
-            flairParts.push(`Template: ${this.flair_template_id}`);
-        }
+        const renderedText = this.text === '' ? '' : await this.renderContent(this.text, item, ruleResults, actionResults) as string;
+        flairParts.push(`Text: ${renderedText === '' ? '(None)' : renderedText}`);
+
+        const renderedCss = this.css === '' ? '' : await this.renderContent(this.css, item, ruleResults, actionResults) as string;
+        flairParts.push(`CSS: ${renderedCss === '' ? '(None)' : renderedCss}`);
+
+        flairParts.push(`Template: ${this.flair_template_id === '' ? '(None)' : this.flair_template_id}`);
+
         const flairSummary = flairParts.length === 0 ? 'No flair (unflaired)' : flairParts.join(' | ');
         this.logger.verbose(flairSummary);
         if (item instanceof Submission) {
@@ -51,9 +50,9 @@ export class FlairAction extends Action {
                     await item.assignFlair({flair_template_id: this.flair_template_id}).then(() => {});
                     item.link_flair_template_id = this.flair_template_id;
                 } else {
-                    await item.assignFlair({text: this.text, cssClass: this.css}).then(() => {});
-                    item.link_flair_css_class = this.css;
-                    item.link_flair_text = this.text;
+                    await item.assignFlair({text: renderedText, cssClass: renderedCss}).then(() => {});
+                    item.link_flair_css_class = renderedCss;
+                    item.link_flair_text = renderedText;
                 }
                 await this.resources.resetCacheForItem(item);
             }
