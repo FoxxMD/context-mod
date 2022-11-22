@@ -7,6 +7,7 @@ import {
     PASS, triggeredIndicator, windowConfigToWindowCriteria
 } from "../util";
 import {
+    RegExResultWithTest,
     RuleResult,
 } from "../Common/interfaces";
 import dayjs from 'dayjs';
@@ -14,10 +15,11 @@ import {SimpleError} from "../Utils/Errors";
 import {JoinOperands} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 import {
-    comparisonTextOp,
+    comparisonTextOp, GenericComparison,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison
 } from "../Common/Infrastructure/Comparisons";
+import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 
 export interface RegexCriteria {
     /**
@@ -27,13 +29,23 @@ export interface RegexCriteria {
      * */
     name?: string
     /**
-     * A valid Regular Expression to test content against
+     * A valid Regular Expression, or list of expressions, to test content against
      *
      * If no flags are specified then the **global** flag is used by default
      *
      * @examples ["/reddit|FoxxMD/ig"]
      * */
-    regex: string,
+    regex: string | string[],
+
+    /**
+     * Determines if ALL regexes listed are run or if regexes are only run until one is matched.
+     *
+     * * `true` => all regexes are always run
+     * * `false` => regexes are run until one matches
+     *
+     * @default false
+     * */
+    exhaustive?: boolean
 
     /**
      * Which content from an Activity to test the regex against
@@ -157,6 +169,7 @@ export class RegexRule extends Rule {
             const {
                 name = (index + 1),
                 regex,
+                exhaustive = false,
                 testOn: testOnVals = ['title', 'body'],
                 lookAt = 'all',
                 matchThreshold = '> 0',
@@ -174,13 +187,7 @@ export class RegexRule extends Rule {
                 return acc.concat(curr);
             }, []);
 
-            // check regex
-            const regexContent = await this.resources.getContent(regex);
-            const reg = parseStringToRegex(regexContent, 'g');
-            if(reg === undefined) {
-                throw new SimpleError(`Value given for regex on Criteria ${name} was not valid: ${regex}`);
-            }
-            // ok cool its a valid regex
+            const regexTests: RegExp[] = await this.convertToRegexArray(name, regex);
 
             const matchComparison = parseGenericValueComparison(matchThreshold);
             const activityMatchComparison = activityMatchThreshold === null ? undefined : parseGenericValueOrPercentComparison(activityMatchThreshold);
@@ -198,12 +205,13 @@ export class RegexRule extends Rule {
 
             // first lets see if the activity we are checking satisfies thresholds
             // since we may be able to avoid api calls to get history
-            let actMatches = this.getMatchesFromActivity(item, testOn, reg);
-            matches = matches.concat(actMatches).slice(0, 100);
-            matchCount += actMatches.length;
+            let actMatches = getMatchesFromActivity(item, testOn, regexTests, exhaustive);
+            const actMatchSummary = regexResultsSummary(actMatches);
+            matches = matches.concat(actMatchSummary.matches).slice(0, 100);
+            matchCount += actMatchSummary.matches.length;
 
             activitiesTested++;
-            const singleMatched = comparisonTextOp(actMatches.length, matchComparison.operator, matchComparison.value);
+            const singleMatched = comparisonTextOp(actMatchSummary.matches.length, matchComparison.operator, matchComparison.value);
             if (singleMatched) {
                 activitiesMatchedCount++;
             }
@@ -233,7 +241,7 @@ export class RegexRule extends Rule {
                 }
 
                 history = await this.resources.getAuthorActivities(item.author, strongWindow);
-                // remove current activity it exists in history so we don't count it twice
+                // remove current activity if it exists in history so we don't count it twice
                 history = history.filter(x => x.id !== item.id);
                 const historyLength = history.length;
 
@@ -252,10 +260,12 @@ export class RegexRule extends Rule {
 
                 for (const h of history) {
                     activitiesTested++;
-                    const aMatches = this.getMatchesFromActivity(h, testOn, reg);
-                    matches = matches.concat(aMatches).slice(0, 100);
-                    matchCount += aMatches.length;
-                    const matched = comparisonTextOp(aMatches.length, matchComparison.operator, matchComparison.value);
+                    const aMatches = getMatchesFromActivity(h, testOn, regexTests, exhaustive);
+                    actMatches = actMatches.concat(aMatches);
+                    const actHistoryMatchSummary = regexResultsSummary(aMatches);
+                    matches = matches.concat(actHistoryMatchSummary.matches).slice(0, 100);
+                    matchCount += actHistoryMatchSummary.matches.length;
+                    const matched = comparisonTextOp(actHistoryMatchSummary.matches.length, matchComparison.operator, matchComparison.value);
                     if (matched) {
                         activitiesMatchedCount++;
                     }
@@ -282,10 +292,19 @@ export class RegexRule extends Rule {
                 humanWindow = '1 Item';
             }
 
+            // to provide at least one useful regex for this criteria
+            // use the first regex found by default
+            let relevantRegex: string = regexTests[0].toString();
+            // but if more than one regex was listed AND we did have matches
+            // then use the first regex that actually got a match
+            if(regexTests.length > 0 && actMatches.length > 0) {
+                relevantRegex = actMatches[0].test.toString();
+            }
+
             const critResults = {
                 criteria: {
                     name,
-                    regex: regex !== regexContent ? `${regex} from ${regexContent}` : regex,
+                    regex: relevantRegex,
                     testOn,
                     matchThreshold,
                     activityMatchThreshold,
@@ -352,42 +371,115 @@ export class RegexRule extends Rule {
         return Promise.resolve([criteriaMet, this.getResult(criteriaMet, {result, data: {results: criteriaResults, matchSample }})]);
     }
 
-    protected getMatchesFromActivity(a: (Submission | Comment), testOn: string[], reg: RegExp): string[] {
-        let m: string[] = [];
-        // determine what content we are testing
-        let contents: string[] = [];
-        if (asSubmission(a)) {
-            for (const l of testOn) {
-                switch (l) {
-                    case 'title':
-                        contents.push(a.title);
-                        break;
-                    case 'body':
-                        if (a.is_self) {
-                            contents.push(a.selftext);
-                        }
-                        break;
-                    case 'url':
-                        if (isExternalUrlSubmission(a)) {
-                            contents.push(a.url);
-                        }
-                        break;
-                }
+    protected async convertToRegexArray(name: string | number, value: string | string[]): Promise<RegExp[]> {
+        const regexTests: RegExp[] = [];
+        const regexStringVals = typeof value === 'string' ? [value] : value;
+        for(const r of regexStringVals) {
+            // check regex
+            const regexContent = await this.resources.getContent(r);
+            const reg = parseStringToRegex(regexContent, 'ig');
+            if (reg === undefined) {
+                throw new SimpleError(`Value given for regex on Criteria ${name} was not valid: ${value}`);
             }
-        } else {
-            contents.push(a.body)
+            // ok cool its a valid regex
+            regexTests.push(reg);
         }
-
-        for (const c of contents) {
-            const results = parseRegex(reg, c);
-            if(results !== undefined) {
-                for(const r of results) {
-                    m.push(r.match);
-                }
-            }
-        }
-        return m;
+        return regexTests;
     }
+}
+
+export const getMatchResultsFromContent = (contents: string[], reg: RegExp): RegExResultWithTest[] => {
+    let m: RegExResultWithTest[] = [];
+    for (const c of contents) {
+        const results = parseRegex(reg, c);
+        if(results !== undefined) {
+            for(const r of results) {
+                m.push({...r, test: reg});
+            }
+        }
+    }
+    return m;
+}
+
+export const regexResultsSummary = (results: RegExResultWithTest[]) => {
+    const matchResults: ActivityMatchResults = {
+        matches: [],
+        matchesByTest: {},
+        groups: {}
+    }
+
+    for (const r of results) {
+        if (matchResults.matchesByTest[r.test.toString()] === undefined) {
+            matchResults.matchesByTest[r.test.toString()] = [];
+        }
+        matchResults.matchesByTest[r.test.toString()].push(r.match);
+        matchResults.matches.push(r.match);
+        if (r.named !== undefined) {
+            Object.entries(r.named).forEach(([key, val]) => {
+                if (matchResults.groups[key] === undefined) {
+                    matchResults.groups[key] = [];
+                }
+                matchResults.groups[key].push(val);
+            });
+        }
+    }
+    return matchResults;
+}
+
+export const getMatchesFromActivity = (a: (Submission | Comment), testOn: string[], regexes: RegExp[], exhaustive: boolean): RegExResultWithTest[] => {
+    // determine what content we are testing
+    let contents: string[] = getMatchableContent(a, testOn);
+    let results: RegExResultWithTest[] = [];
+
+    for (const reg of regexes) {
+        const res = getMatchResultsFromContent(contents, reg);
+        if(res.length > 0) {
+            results = results.concat(res);
+            // only continue testing if the user wants to exhaustively check all regexes (to get more matches?)
+            if(!exhaustive) {
+                return results;
+            }
+        }
+    }
+    return results;
+}
+
+const getMatchableContent = (a: SnoowrapActivity, testOn: string[]) => {
+    let contents: string[] = [];
+    if (asSubmission(a)) {
+        for (const l of testOn) {
+            switch (l) {
+                case 'title':
+                    contents.push(a.title);
+                    break;
+                case 'body':
+                    if (a.is_self) {
+                        contents.push(a.selftext);
+                    }
+                    break;
+                case 'url':
+                    if (isExternalUrlSubmission(a)) {
+                        contents.push(a.url);
+                    }
+                    break;
+            }
+        }
+    } else {
+        contents.push(a.body)
+    }
+    return contents;
+}
+
+interface RegexMatchComparisonOptions {
+    matchComparison: GenericComparison
+    activityMatchComparison?: GenericComparison
+    totalMatchComparison?: GenericComparison
+}
+
+interface ActivityMatchResults {
+    matches: string[]
+    matchesByTest: Record<string, string[]>
+    groups: Record<string, string[]>
 }
 
 interface RegexConfig {

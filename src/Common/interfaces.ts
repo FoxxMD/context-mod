@@ -748,6 +748,10 @@ export interface RegExResult {
     named: NamedGroup
 }
 
+export interface RegExResultWithTest extends RegExResult {
+    test: RegExp
+}
+
 export type StrongCache = {
     authorTTL: number | boolean,
     userNotesTTL: number | boolean,
