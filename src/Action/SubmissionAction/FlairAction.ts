@@ -48,7 +48,7 @@ export class FlairAction extends Action {
                     // assignFlair uses /api/flair (mod endpoint)
                     // selectFlair uses /api/selectflair (self endpoint for user to choose their own flair for submission)
                     // @ts-ignore
-                    await item.assignFlair({flair_template_id: this.flair_template_id}).then(() => {});
+                    await item.selectFlair({flair_template_id: this.flair_template_id}).then(() => {});
                     item.link_flair_template_id = this.flair_template_id;
                 } else {
                     await item.assignFlair({text: this.text, cssClass: this.css}).then(() => {});
