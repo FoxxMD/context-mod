@@ -26,6 +26,8 @@ export class UserFlairAction extends Action {
   async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
     const dryRun = this.getRuntimeAwareDryrun(options);
     let flairParts = [];
+    let renderedText: string | undefined = undefined;
+    let renderedCss: string | undefined = undefined;
 
     if (this.flair_template_id !== undefined) {
       flairParts.push(`Flair template ID: ${this.flair_template_id}`)
@@ -34,10 +36,12 @@ export class UserFlairAction extends Action {
       }
     } else {
       if (this.text !== undefined) {
-        flairParts.push(`Text: ${this.text}`);
+        renderedText = await this.renderContent(this.text, item, ruleResults, actionResults) as string;
+        flairParts.push(`Text: ${renderedText}`);
       }
       if (this.css !== undefined) {
-        flairParts.push(`CSS: ${this.css}`);
+        renderedCss = await this.renderContent(this.css, item, ruleResults, actionResults) as string;
+        flairParts.push(`CSS: ${renderedCss}`);
       }
     }
 
@@ -58,7 +62,7 @@ export class UserFlairAction extends Action {
           this.logger.error('Either the flair template ID is incorrect or you do not have permission to access it.');
           throw err;
         }
-      } else if (this.text === undefined && this.css === undefined) {
+      } else if (renderedText === undefined && renderedCss === undefined) {
         // @ts-ignore
         await item.subreddit.deleteUserFlair(item.author.name);
         item.author_flair_css_class = null;
@@ -68,11 +72,11 @@ export class UserFlairAction extends Action {
         // @ts-ignore
         await item.author.assignFlair({
           subredditName: item.subreddit.display_name,
-          cssClass: this.css,
-          text: this.text,
+          cssClass: renderedCss,
+          text: renderedText,
         });
-        item.author_flair_text = this.text ?? null;
-        item.author_flair_css_class = this.css ?? null;
+        item.author_flair_text = renderedText ?? null;
+        item.author_flair_css_class = renderedCss ?? null;
       }
       await this.resources.resetCacheForItem(item);
       if(typeof item.author !== 'string') {

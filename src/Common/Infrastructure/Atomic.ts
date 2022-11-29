@@ -111,6 +111,19 @@ export interface DurationObject {
 
 export type JoinOperands = 'OR' | 'AND';
 export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
+export const POLLING_UNMODERATED: PollOn = 'unmoderated';
+export const POLLING_MODQUEUE: PollOn = 'modqueue';
+export const POLLING_SUBMISSIONS: PollOn = 'newSub';
+export const POLLING_COMMENTS: PollOn = 'newComm';
+export const pollOnTypes: PollOn[] = [POLLING_UNMODERATED, POLLING_MODQUEUE, POLLING_SUBMISSIONS, POLLING_COMMENTS];
+export const pollOnTypeMapping: Map<string, PollOn> = new Map([
+    ['unmoderated', POLLING_UNMODERATED],
+    ['modqueue', POLLING_MODQUEUE],
+    ['newsub', POLLING_SUBMISSIONS],
+    ['newcomm', POLLING_COMMENTS],
+    // be nice if user mispelled
+    ['newcom', POLLING_COMMENTS]
+]);
 export type ModeratorNames = 'self' | 'automod' | 'automoderator' | string;
 export type Invokee = 'system' | 'user';
 export type RunState = 'running' | 'paused' | 'stopped';

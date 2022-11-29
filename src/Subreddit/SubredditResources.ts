@@ -1030,13 +1030,13 @@ export class SubredditResources {
         }
     }
 
-    async getAuthorActivities(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<SnoowrapActivity[]> {
+    async getAuthorActivities(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing, prefetchedActivities?: SnoowrapActivity[]): Promise<SnoowrapActivity[]> {
 
-        const {post} = await this.getAuthorActivitiesWithFilter(user, options, customListing);
+        const {post} = await this.getAuthorActivitiesWithFilter(user, options, customListing, prefetchedActivities);
         return post;
     }
 
-    async getAuthorActivitiesWithFilter(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<FetchedActivitiesResult> {
+    async getAuthorActivitiesWithFilter(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing, prefetchedActivities?: SnoowrapActivity[]): Promise<FetchedActivitiesResult> {
         let listFuncName: string;
         let listFunc: ListingFunc;
 
@@ -1064,21 +1064,21 @@ export class SubredditResources {
             ...(cloneDeep(options)),
         }
 
-        return await this.getActivities(user, criteriaWithDefaults, {func: listFunc, name: listFuncName});
+        return await this.getActivities(user, criteriaWithDefaults, {func: listFunc, name: listFuncName}, prefetchedActivities);
     }
 
-    async getAuthorComments(user: RedditUser, options: ActivityWindowCriteria): Promise<Comment[]> {
-        return await this.getAuthorActivities(user, {...options, fetch: 'comment'}) as unknown as Promise<Comment[]>;
+    async getAuthorComments(user: RedditUser, options: ActivityWindowCriteria, prefetchedActivities?: SnoowrapActivity[]): Promise<Comment[]> {
+        return await this.getAuthorActivities(user, {...options, fetch: 'comment'}, undefined, prefetchedActivities) as unknown as Promise<Comment[]>;
     }
 
-    async getAuthorSubmissions(user: RedditUser, options: ActivityWindowCriteria): Promise<Submission[]> {
+    async getAuthorSubmissions(user: RedditUser, options: ActivityWindowCriteria, prefetchedActivities?: SnoowrapActivity[]): Promise<Submission[]> {
         return await this.getAuthorActivities(user, {
             ...options,
             fetch: 'submission'
-        }) as unknown as Promise<Submission[]>;
+        }, undefined,prefetchedActivities) as unknown as Promise<Submission[]>;
     }
 
-    async getActivities(user: RedditUser, options: ActivityWindowCriteria, listingData: NamedListing): Promise<FetchedActivitiesResult> {
+    async getActivities(user: RedditUser, options: ActivityWindowCriteria, listingData: NamedListing, prefetchedActivities: SnoowrapActivity[] = []): Promise<FetchedActivitiesResult> {
 
         try {
 
@@ -1213,11 +1213,23 @@ export class SubredditResources {
                     }
                 }
 
-                let unFilteredItems: SnoowrapActivity[] | undefined;
-
+                let preFilteredPrefetchedActivities = [...prefetchedActivities];
+                if(preFilteredPrefetchedActivities.length > 0) {
+                    switch(options.fetch) {
+                        // TODO this may not work if using a custom listingFunc that does not include fetch type
+                        case 'comment':
+                            preFilteredPrefetchedActivities = preFilteredPrefetchedActivities.filter(x => asComment(x));
+                            break;
+                        case 'submission':
+                            preFilteredPrefetchedActivities = preFilteredPrefetchedActivities.filter(x => asSubmission(x));
+                            break;
+                    }
+                    preFilteredPrefetchedActivities = await this.filterListingWithHistoryOptions(preFilteredPrefetchedActivities, user, options.filterOn?.pre);
+                }
+                let unFilteredItems: SnoowrapActivity[] | undefined = [...preFilteredPrefetchedActivities];
+                pre = pre.concat(preFilteredPrefetchedActivities);
 
                 const { func: listingFunc } = listingData;
-
 
                 let listing = await listingFunc(getAuthorHistoryAPIOptions(options));
                 let hitEnd = false;
@@ -1228,6 +1240,9 @@ export class SubredditResources {
                         timeOk = false;
 
                     let listSlice = listing.slice(offset - chunkSize);
+                    // filter out any from slice that were already included from prefetched list so that prefetched aren't included twice
+                    listSlice = preFilteredPrefetchedActivities.length === 0 ? listSlice : listSlice.filter(x => !preFilteredPrefetchedActivities.some(y => y.name === x.name));
+
                     let preListSlice = await this.filterListingWithHistoryOptions(listSlice, user, options.filterOn?.pre);
 
                     // its more likely the time criteria is going to be hit before the count criteria
@@ -1502,6 +1517,7 @@ export class SubredditResources {
             usernotes,
             ruleResults,
             actionResults,
+            author: (val) => this.getAuthor(val)
         });
     }
 

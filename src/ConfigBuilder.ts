@@ -8,7 +8,7 @@ import {
     overwriteMerge,
     parseBool, parseExternalUrl, parseUrlContext, parseWikiContext, randomId,
     readConfigFile,
-    removeUndefinedKeys, resolvePathFromEnvWithRelative, toStrongSharingACLConfig
+    removeUndefinedKeys, resolvePathFromEnvWithRelative, toPollOn, toStrongSharingACLConfig
 } from "./util";
 
 import Ajv, {Schema} from 'ajv';
@@ -74,8 +74,8 @@ import {ErrorWithCause} from "pony-cause";
 import {RunConfigHydratedData, RunConfigData, RunConfigObject} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
 import {
-    CacheProvider, ConfigFormat, ConfigFragmentParseFunc,
-    PollOn
+    CacheProvider, ConfigFormat, ConfigFragmentParseFunc, POLLING_MODQUEUE, POLLING_UNMODERATED,
+    PollOn, pollOnTypes
 } from "./Common/Infrastructure/Atomic";
 import {
     asFilterOptionsJson,
@@ -452,27 +452,31 @@ export class ConfigBuilder {
 
 export const buildPollingOptions = (values: (string | PollingOptions)[]): PollingOptionsStrong[] => {
     let opts: PollingOptionsStrong[] = [];
+    let rawOpts: PollingOptions;
     for (const v of values) {
         if (typeof v === 'string') {
-            opts.push({
-                pollOn: v as PollOn,
-                interval: DEFAULT_POLLING_INTERVAL,
-                limit: DEFAULT_POLLING_LIMIT,
-            });
+            rawOpts = {pollOn: v as PollOn}; // maybeee
         } else {
-            const {
-                pollOn: p,
-                interval = DEFAULT_POLLING_INTERVAL,
-                limit = DEFAULT_POLLING_LIMIT,
-                delayUntil,
-            } = v;
-            opts.push({
-                pollOn: p as PollOn,
-                interval,
-                limit,
-                delayUntil,
-            });
+            rawOpts = v;
         }
+
+        const {
+            pollOn: p,
+            interval = DEFAULT_POLLING_INTERVAL,
+            limit = DEFAULT_POLLING_LIMIT,
+            delayUntil,
+        } = rawOpts;
+
+        const pVal = toPollOn(p);
+        if (opts.some(x => x.pollOn === pVal)) {
+            throw new SimpleError(`Polling source ${pVal} cannot appear more than once in polling options`);
+        }
+        opts.push({
+            pollOn: pVal,
+            interval,
+            limit,
+            delayUntil,
+        });
     }
     return opts;
 }
@@ -796,7 +800,7 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
             heartbeatInterval: heartbeat,
         },
         polling: {
-            shared: sharedMod ? ['unmoderated', 'modqueue'] : undefined,
+            shared: sharedMod ? [POLLING_UNMODERATED, POLLING_MODQUEUE] : undefined,
         },
         nanny: {
             softLimit,
@@ -908,7 +912,7 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
             heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
         },
         polling: {
-            shared: parseBool(process.env.SHARE_MOD) ? ['unmoderated', 'modqueue'] : undefined,
+            shared: parseBool(process.env.SHARE_MOD) ? [POLLING_UNMODERATED, POLLING_MODQUEUE] : undefined,
         },
         nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
@@ -1525,10 +1529,10 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
     }
 
-    let realShared = shared === true ? ['unmoderated', 'modqueue', 'newComm', 'newSub'] : shared;
+    let realShared: PollOn[] = shared === true ? pollOnTypes : shared.map(toPollOn);
     if (sharedMod === true) {
-        realShared.push('unmoderated');
-        realShared.push('modqueue');
+        realShared.push(POLLING_UNMODERATED);
+        realShared.push(POLLING_MODQUEUE);
     }
 
     const botLevelStatDefaults = {...statDefaultsFromOp, ...databaseStatisticsDefaults};
@@ -1566,7 +1570,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         caching: botCache,
         userAgent,
         polling: {
-            shared: [...new Set(realShared)] as PollOn[],
+            shared: Array.from(new Set(realShared)),
             stagger,
             limit,
             interval,

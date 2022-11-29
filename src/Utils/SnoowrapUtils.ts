@@ -133,6 +133,7 @@ export interface TemplateContext {
     ruleResults?: RuleResultEntity[]
     actionResults?: ActionResultEntity[]
     activity?: SnoowrapActivity
+    author?: (val: string | RedditUser) => Promise<RedditUser>
     [key: string]: any
 }
 
@@ -140,10 +141,24 @@ export const renderContent = async (template: string, data: TemplateContext = {}
     const {
         usernotes,
         ruleResults,
+        author,
         actionResults,
         activity,
         ...restContext
     } = data;
+
+    let fetchedUser: RedditUser | undefined;
+    // @ts-ignore
+    const user = async (): Promise<RedditUser> => {
+        if(fetchedUser === undefined) {
+            if(author !== undefined) {
+                // @ts-ignore
+                fetchedUser = await author(activity.author);
+            }
+        }
+        // @ts-ignore
+        return fetchedUser;
+    }
 
     let view: GenericContentTemplateData = {
         botLink: BOT_LINK,
@@ -171,10 +186,24 @@ export const renderContent = async (template: string, data: TemplateContext = {}
 
         view.modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subreddit}&message=${encodeURIComponent(permalink)}`;
 
+        const author: any = {
+            toString: () => getActivityAuthorName(activity.author)
+        };
+
+        if(template.includes('{{item.author.')) {
+            // @ts-ignore
+            const auth = await user();
+
+            author.age = dayjs.unix(auth.created).fromNow(true);
+            author.linkKarma = auth.link_karma;
+            author.commentKarma = auth.comment_karma;
+            author.totalKarma = auth.comment_karma + auth.link_karma;
+            author.verified = auth.has_verified_email;
+        }
+
         const templateData: any = {
             kind: activity instanceof Submission ? 'submission' : 'comment',
-            // @ts-ignore
-            author: getActivityAuthorName(await activity.author),
+            author,
             votes: activity.score,
             age: dayjs.duration(dayjs().diff(dayjs.unix(activity.created))).humanize(),
             permalink,

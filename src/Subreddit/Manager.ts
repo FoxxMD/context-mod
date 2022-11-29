@@ -93,8 +93,8 @@ import {EntityRunState} from "../Common/Entities/EntityRunState/EntityRunState";
 import {
     ActivitySourceValue,
     EventRetentionPolicyRange,
-    Invokee,
-    PollOn,
+    Invokee, POLLING_COMMENTS, POLLING_MODQUEUE, POLLING_SUBMISSIONS, POLLING_UNMODERATED,
+    PollOn, pollOnTypes,
     recordOutputTypes,
     RunState
 } from "../Common/Infrastructure/Atomic";
@@ -635,7 +635,7 @@ export class Manager extends EventEmitter implements RunningStates {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
             const {
-                polling = [{pollOn: 'unmoderated', limit: DEFAULT_POLLING_LIMIT, interval: DEFAULT_POLLING_INTERVAL}],
+                polling = [{pollOn: POLLING_SUBMISSIONS, limit: DEFAULT_POLLING_LIMIT, interval: DEFAULT_POLLING_INTERVAL}],
                 caching,
                 credentials,
                 dryRun,
@@ -957,7 +957,7 @@ export class Manager extends EventEmitter implements RunningStates {
         await this.resources.setActivityLastSeenDate(item.name);
 
         // if modqueue is running then we know we are checking for new reports every X seconds
-        if(options.activitySource.identifier === 'modqueue') {
+        if(options.activitySource.identifier === POLLING_MODQUEUE) {
             // if the activity is from modqueue and only has one report then we know that report was just created
             if(item.num_reports === 1
                 // otherwise if it has more than one report AND we have seen it (its only seen if it has already been stored (in below block))
@@ -1325,25 +1325,20 @@ export class Manager extends EventEmitter implements RunningStates {
         }
     }
 
-    isPollingShared(streamName: string): boolean {
+    isPollingShared(streamName: PollOn): boolean {
         const pollOption = this.pollOptions.find(x => x.pollOn === streamName);
-        return pollOption !== undefined && pollOption.limit === DEFAULT_POLLING_LIMIT && pollOption.interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(streamName as PollOn);
+        return pollOption !== undefined && pollOption.limit === DEFAULT_POLLING_LIMIT && pollOption.interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(streamName);
     }
 
     async buildPolling() {
 
-        const sources: PollOn[] = ['unmoderated', 'modqueue', 'newComm', 'newSub'];
+        const sources = [...pollOnTypes];
 
         const subName = this.subreddit.display_name;
 
         for (const source of sources) {
 
-            if (!sources.includes(source)) {
-                this.logger.error(`'${source}' is not a valid polling source. Valid sources: unmoderated | modqueue | newComm | newSub`);
-                continue;
-            }
-
-            const pollOpt = this.pollOptions.find(x => x.pollOn.toLowerCase() === source.toLowerCase());
+            const pollOpt = this.pollOptions.find(x => x.pollOn === source);
             if (pollOpt === undefined) {
                 if(this.sharedStreamCallbacks.has(source)) {
                     this.logger.debug(`Removing listener for shared polling on ${source.toUpperCase()} because it no longer exists in config`);
@@ -1366,11 +1361,11 @@ export class Manager extends EventEmitter implements RunningStates {
                 let modStreamType: string | undefined;
 
                 switch (source) {
-                    case 'unmoderated':
+                    case POLLING_UNMODERATED:
                         if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
-                            modStreamType = 'unmoderated';
+                            modStreamType = POLLING_UNMODERATED;
                             // use default mod stream from resources
-                            stream = this.cacheManager.modStreams.get('unmoderated') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                            stream = this.cacheManager.modStreams.get(POLLING_UNMODERATED) as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
                         } else {
                             stream = new UnmoderatedStream(this.client, {
                                 subreddit: this.subreddit.display_name,
@@ -1380,11 +1375,11 @@ export class Manager extends EventEmitter implements RunningStates {
                             });
                         }
                         break;
-                    case 'modqueue':
+                    case POLLING_MODQUEUE:
                         if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
-                            modStreamType = 'modqueue';
+                            modStreamType = POLLING_MODQUEUE;
                             // use default mod stream from resources
-                            stream = this.cacheManager.modStreams.get('modqueue') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                            stream = this.cacheManager.modStreams.get(POLLING_MODQUEUE) as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
                         } else {
                             stream = new ModQueueStream(this.client, {
                                 subreddit: this.subreddit.display_name,
@@ -1394,11 +1389,11 @@ export class Manager extends EventEmitter implements RunningStates {
                             });
                         }
                         break;
-                    case 'newSub':
+                    case POLLING_SUBMISSIONS:
                         if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
-                            modStreamType = 'newSub';
+                            modStreamType = POLLING_SUBMISSIONS;
                             // use default mod stream from resources
-                            stream = this.cacheManager.modStreams.get('newSub') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                            stream = this.cacheManager.modStreams.get(POLLING_SUBMISSIONS) as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
                         } else {
                             stream = new SubmissionStream(this.client, {
                                 subreddit: this.subreddit.display_name,
@@ -1408,11 +1403,11 @@ export class Manager extends EventEmitter implements RunningStates {
                             });
                         }
                         break;
-                    case 'newComm':
+                    case POLLING_COMMENTS:
                         if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
-                            modStreamType = 'newComm';
+                            modStreamType = POLLING_COMMENTS;
                             // use default mod stream from resources
-                            stream = this.cacheManager.modStreams.get('newComm') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                            stream = this.cacheManager.modStreams.get(POLLING_COMMENTS) as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
                         } else {
                             stream = new CommentStream(this.client, {
                                 subreddit: this.subreddit.display_name,
@@ -1422,6 +1417,8 @@ export class Manager extends EventEmitter implements RunningStates {
                             });
                         }
                         break;
+                    default:
+                        throw new CMError(`This shouldn't happen! All polling sources are enumerated in switch. Source value: ${source}`)
                 }
 
                 if (stream === undefined) {
@@ -1514,10 +1511,10 @@ export class Manager extends EventEmitter implements RunningStates {
     }
 
     noChecksWarning = (source: PollOn) => (listing: any) => {
-        if (this.commentChecks.length === 0 && ['modqueue', 'newComm'].some(x => x === source)) {
+        if (this.commentChecks.length === 0 && [POLLING_MODQUEUE, POLLING_COMMENTS].some(x => x === source)) {
             this.logger.warn(`Polling '${source.toUpperCase()}' may return Comments but no comments checks were configured.`);
         }
-        if (this.submissionChecks.length === 0 && ['unmoderated', 'modqueue', 'newSub'].some(x => x === source)) {
+        if (this.submissionChecks.length === 0 && [POLLING_UNMODERATED, POLLING_MODQUEUE, POLLING_SUBMISSIONS].some(x => x === source)) {
             this.logger.warn(`Polling '${source.toUpperCase()}' may return Submissions but no submission checks were configured.`);
         }
     }
@@ -1670,7 +1667,7 @@ export class Manager extends EventEmitter implements RunningStates {
             }
             this.startedAt = dayjs();
 
-            const modQueuePollOpts = this.pollOptions.find(x => x.pollOn === 'modqueue');
+            const modQueuePollOpts = this.pollOptions.find(x => x.pollOn === POLLING_MODQUEUE);
             if(modQueuePollOpts !== undefined) {
                 this.modqueueInterval = modQueuePollOpts.interval;
             }
