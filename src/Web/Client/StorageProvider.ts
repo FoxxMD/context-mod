@@ -12,6 +12,7 @@ import {Logger} from "winston";
 import {WebSetting} from "../../Common/WebEntities/WebSetting";
 import {ErrorWithCause} from "pony-cause";
 import {createCacheManager} from "../../Common/Cache";
+import {MysqlDriver} from "typeorm/driver/mysql/MysqlDriver";
 
 export interface CacheManagerStoreOptions {
     prefix?: string
@@ -103,7 +104,12 @@ export class DatabaseStorageProvider extends StorageProvider {
     }
 
     createSessionStore(options?: TypeormStoreOptions): Store {
-        return new TypeormStore(options).connect(this.clientSessionRepo)
+        // https://github.com/freshgiammi-lab/connect-typeorm#implement-the-session-entity
+        // https://github.com/freshgiammi-lab/connect-typeorm/issues/8
+        // usage of LIMIT in subquery is not supported by mariadb/mysql
+        // limitSubquery: false -- turns off LIMIT usage
+        const realOptions = this.database.driver instanceof MysqlDriver ? {...options, limitSubquery: false} : options;
+        return new TypeormStore(realOptions).connect(this.clientSessionRepo)
     }
 
     async getSessionSecret(): Promise<string | undefined> {
