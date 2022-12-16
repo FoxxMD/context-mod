@@ -104,7 +104,7 @@ import {
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySourceValue,
+    ActivitySourceValue, asSubredditPlaceholder,
     ConfigFragmentParseFunc,
     DurationVal,
     EventRetentionPolicyRange,
@@ -115,7 +115,7 @@ import {
     ModUserNoteLabel,
     RelativeDateTimeMatch,
     statFrequencies,
-    StatisticFrequencyOption,
+    StatisticFrequencyOption, SubredditPlaceholderType,
     WikiContext
 } from "../Common/Infrastructure/Atomic";
 import {
@@ -1891,8 +1891,14 @@ export class SubredditResources {
                 if (crit[k] !== undefined) {
                     switch (k) {
                         case 'name':
-                            const nameReg = crit[k] as RegExp;
-                            if(!nameReg.test(subreddit.display_name)) {
+                            const nameReg = crit[k] as RegExp | SubredditPlaceholderType;
+                            // placeholder {{subreddit}} tests as true if the given subreddit matches the subreddit this bot is processing the activity from
+                            if (asSubredditPlaceholder(nameReg)) {
+                                if (this.subreddit.display_name !== subreddit.display_name) {
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} (${this.subreddit.display_name}) | Found => ${k}:${subreddit.display_name}`)
+                                    return false
+                                }
+                            } else if (!nameReg.test(subreddit.display_name)) {
                                 return false;
                             }
                             break;

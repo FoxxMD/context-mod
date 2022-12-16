@@ -4,7 +4,7 @@ import {
     DurationComparor,
     ModeratorNameCriteria,
     ModeratorNames, ModActionType,
-    ModUserNoteLabel, RelativeDateTimeMatch
+    ModUserNoteLabel, RelativeDateTimeMatch, SubredditPlaceholderType
 } from "../Atomic";
 import {ActivityType, MaybeActivityType} from "../Reddit";
 import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
@@ -57,7 +57,7 @@ export interface SubredditCriteria {
 }
 
 export interface StrongSubredditCriteria extends SubredditCriteria {
-    name?: RegExp
+    name?: RegExp | SubredditPlaceholderType
 }
 
 export const defaultStrongSubredditCriteriaOptions = {

@@ -408,3 +408,9 @@ export interface RuleResultsTemplateData {
 export interface GenericContentTemplateData extends BaseTemplateData, Partial<RuleResultsTemplateData>, Partial<ActionResultsTemplateData> {
     item?: (SubmissionTemplateData | CommentTemplateData)
 }
+
+export type SubredditPlaceholderType = '{{subreddit}}';
+export const subredditPlaceholder: SubredditPlaceholderType = '{{subreddit}}';
+export const asSubredditPlaceholder = (val: any): val is SubredditPlaceholderType => {
+    return typeof val === 'string' && val.toLowerCase() === '{{subreddit}}';
+}

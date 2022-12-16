@@ -70,7 +70,7 @@ import {
 import {
     ActivitySourceData,
     ActivitySourceTypes,
-    ActivitySourceValue,
+    ActivitySourceValue, asSubredditPlaceholder,
     ConfigFormat,
     DurationVal,
     ExternalUrlContext,
@@ -83,7 +83,7 @@ import {
     RelativeDateTimeMatch,
     statFrequencies,
     StatisticFrequency,
-    StatisticFrequencyOption,
+    StatisticFrequencyOption, subredditPlaceholder, SubredditPlaceholderType,
     UrlContext,
     WikiContext
 } from "./Common/Infrastructure/Atomic";
@@ -1557,7 +1557,7 @@ export const testMaybeStringRegex = (test: string, subject: string, defaultFlags
 }
 
 export const isStrongSubredditState = (value: SubredditCriteria | StrongSubredditCriteria) => {
-    return value.name === undefined || value.name instanceof RegExp;
+    return value.name === undefined || value.name instanceof RegExp || asSubredditPlaceholder(value.name);
 }
 
 export const asStrongSubredditState = (value: any): value is StrongSubredditCriteria => {
@@ -1575,21 +1575,26 @@ export const toStrongSubredditState = (s: SubredditCriteria, opts?: StrongSubred
 
     let nameValOriginallyRegex = false;
 
-    let nameReg: RegExp | undefined;
+    let nameReg: RegExp | undefined | SubredditPlaceholderType;
     if (nameValRaw !== undefined) {
         if (!(nameValRaw instanceof RegExp)) {
             let nameVal = nameValRaw.trim();
-            nameReg = parseStringToRegex(nameVal, defaultFlags);
-            if (nameReg === undefined) {
-                // if sub state has `isUserProfile=true` and config did not provide a regex then
-                // assume the user wants to use the value in "name" to look for a user profile so we prefix created regex with u_
-                const parsedEntity = parseRedditEntity(nameVal, isUserProfile !== undefined && isUserProfile ? 'user' : 'subreddit');
-                // technically they could provide "u_Username" as the value for "name" and we will then match on it regardless of isUserProfile
-                // but like...why would they do that? There shouldn't be any subreddits that start with u_ that aren't user profiles anyway(?)
-                const regPrefix = parsedEntity.type === 'user' ? 'u_' : '';
-                nameReg = parseStringToRegex(`/^${regPrefix}${nameVal}$/`, defaultFlags);
+            if(asSubredditPlaceholder(nameVal)) {
+                nameReg = subredditPlaceholder;
+                nameValOriginallyRegex = false;
             } else {
-                nameValOriginallyRegex = true;
+                nameReg = parseStringToRegex(nameVal, defaultFlags);
+                if (nameReg === undefined) {
+                    // if sub state has `isUserProfile=true` and config did not provide a regex then
+                    // assume the user wants to use the value in "name" to look for a user profile so we prefix created regex with u_
+                    const parsedEntity = parseRedditEntity(nameVal, isUserProfile !== undefined && isUserProfile ? 'user' : 'subreddit');
+                    // technically they could provide "u_Username" as the value for "name" and we will then match on it regardless of isUserProfile
+                    // but like...why would they do that? There shouldn't be any subreddits that start with u_ that aren't user profiles anyway(?)
+                    const regPrefix = parsedEntity.type === 'user' ? 'u_' : '';
+                    nameReg = parseStringToRegex(`/^${regPrefix}${nameVal}$/`, defaultFlags);
+                } else {
+                    nameValOriginallyRegex = true;
+                }
             }
         } else {
             nameValOriginallyRegex = true;
