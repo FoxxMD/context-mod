@@ -2861,7 +2861,7 @@ export const generateSnoowrapEntityFromRedditThing = (data: RedditThing, client:
         case 'user':
             return new RedditUser({id: data.val}, client, false);
         case 'subreddit':
-            return new Subreddit({id: data.val}, client, false);
+            return new Subreddit({name: data.val}, client, false);
         case 'message':
             return new PrivateMessage({id: data.val}, client, false)
 

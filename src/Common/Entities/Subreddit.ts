@@ -1,5 +1,7 @@
-import {Entity, Column, PrimaryColumn, OneToMany, Index} from "typeorm";
+import {Entity, Column, PrimaryColumn, OneToMany, Index, DataSource} from "typeorm";
 import {Activity} from "./Activity";
+import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
+import {Subreddit as SnoowrapSubreddit} from "snoowrap/dist/objects";
 
 export interface SubredditEntityOptions {
     id: string
@@ -24,5 +26,19 @@ export class Subreddit {
             this.id = data.id;
             this.name = data.name;
         }
+    }
+
+    toSnoowrap(client: ExtendedSnoowrap): SnoowrapSubreddit {
+        return new SnoowrapSubreddit({display_name: this.name, name: this.id}, client, false);
+    }
+
+    static async fromSnoowrap(subreddit: SnoowrapSubreddit, db?: DataSource) {
+        if(db !== undefined) {
+           const existing = await db.getRepository(Subreddit).findOneBy({name: subreddit.display_name});
+           if(existing) {
+               return existing;
+           }
+        }
+        return new Subreddit({id: await subreddit.name, name: await subreddit.display_name});
     }
 }

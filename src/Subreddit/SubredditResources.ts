@@ -69,7 +69,16 @@ import {cacheTTLDefaults, createHistoricalDisplayDefaults,} from "../Common/defa
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs, {Dayjs} from "dayjs";
 import ImageData from "../Common/ImageData";
-import {Between, DataSource, DeleteQueryBuilder, LessThan, Repository, SelectQueryBuilder} from "typeorm";
+import {
+    Between, Brackets,
+    DataSource,
+    DeleteQueryBuilder,
+    In,
+    LessThan,
+    NotBrackets,
+    Repository,
+    SelectQueryBuilder
+} from "typeorm";
 import {CMEvent as ActionedEventEntity, CMEvent} from "../Common/Entities/CMEvent";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
@@ -162,6 +171,8 @@ import {ActivitySource} from "../Common/ActivitySource";
 import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
 import {SubredditStats} from "./Stats";
 import {CMCache} from "../Common/Cache";
+import { Activity } from '../Common/Entities/Activity';
+import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -193,6 +204,7 @@ export class SubredditResources {
     botAccount?: string;
     dispatchedActivityRepo: Repository<DispatchedEntity>
     activitySourceRepo: Repository<ActivitySourceEntity>
+    activityRepo: Repository<Activity>
     retention?: EventRetentionPolicyRange
     managerEntity: ManagerEntity
     botEntity: Bot
@@ -229,6 +241,7 @@ export class SubredditResources {
         this.database = database;
         this.dispatchedActivityRepo = this.database.getRepository(DispatchedEntity);
         this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
+        this.activityRepo = this.database.getRepository(Activity);
         this.retention = retention;
         //this.prefix = prefix;
         this.client = client;
@@ -404,21 +417,25 @@ export class SubredditResources {
                     }
                 },
                 relations: {
-                    manager: true
+                    manager: true,
+                    activity: {
+                        submission: true
+                    }
                 }
             });
             const now = dayjs();
+            const toRemove = [];
             for(const dAct of dispatchedActivities) {
                 const shouldDispatchAt = dAct.createdAt.add(dAct.delay.asSeconds(), 'seconds');
                 let tardyHint = '';
                 if(shouldDispatchAt.isBefore(now)) {
-                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
+                    let tardyHint = `Activity ${dAct.activity.id} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
                     if(dAct.tardyTolerant === true) {
                         tardyHint += ` but was configured as ALWAYS 'tardy tolerant' so will be dispatched immediately`;
                     } else if(dAct.tardyTolerant === false) {
                         tardyHint += ` and was not configured as 'tardy tolerant' so will be dropped`;
                         this.logger.warn(tardyHint);
-                        await this.removeDelayedActivity(dAct.id);
+                        toRemove.push(dAct.id);
                         continue;
                     } else {
                         // see if its within tolerance
@@ -426,7 +443,7 @@ export class SubredditResources {
                         if(latest.isBefore(now)) {
                             tardyHint += ` and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
                             this.logger.warn(tardyHint);
-                            await this.removeDelayedActivity(dAct.id);
+                            toRemove.push(dAct.id);
                             continue;
                         } else {
                             tardyHint += `but is within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dispatched immediately`;
@@ -439,27 +456,115 @@ export class SubredditResources {
                 try {
                     this.delayedItems.push(await dAct.toActivityDispatch(this.client))
                 } catch (e) {
-                    this.logger.warn(new ErrorWithCause(`Unable to add Activity ${dAct.activityId} from database delayed activities to in-app delayed activities queue`, {cause: e}));
+                    this.logger.warn(new ErrorWithCause(`Unable to add Activity ${dAct.activity.id} from database delayed activities to in-app delayed activities queue`, {cause: e}));
                 }
+            }
+            if(toRemove.length > 0) {
+                await this.removeDelayedActivity(toRemove);
             }
         }
     }
 
     async addDelayedActivity(data: ActivityDispatch) {
-        const dEntity = await this.dispatchedActivityRepo.save(new DispatchedEntity({...data, manager: this.managerEntity}));
+        // TODO merge this with getActivity or something...
+        if(asComment(data.activity)) {
+            const existingSub =  await this.activityRepo.findOneBy({_id: data.activity.link_id});
+            if(existingSub === null) {
+                const sub = await this.getActivity(new Submission({name: data.activity.link_id}, this.client, false));
+                await this.activityRepo.save(await Activity.fromSnoowrapActivity(sub, {db: this.database}));
+            }
+        }
+        const dEntity = await this.dispatchedActivityRepo.save(new DispatchedEntity({...data, manager: this.managerEntity, activity: await Activity.fromSnoowrapActivity(data.activity, {db: this.database})}));
         data.id = dEntity.id;
         this.delayedItems.push(data);
     }
 
     async removeDelayedActivity(val?: string | string[]) {
-        if(val === undefined) {
-            await this.dispatchedActivityRepo.delete({manager: {id: this.managerEntity.id}});
-            this.delayedItems = [];
-        } else {
+        let dispatched: DispatchedEntity[] = [];
+        const where: FindOptionsWhere<DispatchedEntity> = {
+            manager: {
+                id: this.managerEntity.id
+            }
+        };
+
+        if(val !== undefined) {
             const ids = typeof val === 'string' ? [val] : val;
-            await this.dispatchedActivityRepo.delete(ids);
-            this.delayedItems = this.delayedItems.filter(x => !ids.includes(x.id));
+            where.id = In(ids);
         }
+
+        dispatched = await this.dispatchedActivityRepo.find({
+            where,
+            relations: {
+                manager: true,
+                activity: {
+                    actionedEvents: true,
+                    submission: {
+                        actionedEvents: true
+                    }
+                }
+            }
+        });
+
+        const actualDispatchedIds = dispatched.map(x => x.id);
+        this.logger.debug(`${actualDispatchedIds.length} marked for deletion`, {leaf: 'Delayed Activities'});
+
+        // get potential activities to delete
+        // but only include activities that don't have any actionedEvents
+        let activityIdsToDelete = Array.from(dispatched.reduce((acc, curr) => {
+            if(curr.activity.actionedEvents === null || curr.activity.actionedEvents.length === 0) {
+                acc.add(curr.activity.id);
+            }
+            if(curr.activity.submission !== undefined && curr.activity.submission !== null) {
+                if(curr.activity.submission.actionedEvents === null || curr.activity.submission.actionedEvents.length === 0) {
+                    acc.add(curr.activity.submission.id);
+                }
+            }
+            return acc;
+        }, new Set<string>()));
+        const rawActCount = activityIdsToDelete.length;
+        let activeActCount = 0;
+
+        // if we have any potential activities to delete we now need to get any dispatched actions that reference these activities
+        // that are NOT the ones we are going to delete
+        if(activityIdsToDelete.length > 0) {
+            const activeDispatchedQuery = this.dispatchedActivityRepo.createQueryBuilder('dis')
+                .leftJoinAndSelect('dis.activity', 'activity')
+                .leftJoinAndSelect('activity.submission', 'submission')
+                .where(new NotBrackets((qb) => {
+                    qb.where('dis.id IN (:...currIds)', {currIds: actualDispatchedIds});
+                }))
+                .andWhere(new Brackets((qb) => {
+                    qb.where('activity._id IN (:...actMainIds)', {actMainIds: activityIdsToDelete})
+                    qb.orWhere('submission._id IN (:...actSubIds)', {actSubIds: activityIdsToDelete})
+                }));
+            //const sql = activeDispatchedQuery.getSql();
+            const activeDispatched = await activeDispatchedQuery.getMany();
+
+            // all activity ids, from the actions to delete, that are being used by dispatched actions that are NOT the ones we are going to delete
+            const activeDispatchedIds = Array.from(activeDispatched.reduce((acc, curr) => {
+                acc.add(curr.activity.id);
+                if(curr.activity.submission !== undefined && curr.activity.submission !== null) {
+                    acc.add(curr.activity.submission.id);
+                }
+                return acc;
+            }, new Set<string>()));
+            activeActCount = activeDispatchedIds.length;
+
+            // filter out any that are still in use
+            activityIdsToDelete = activityIdsToDelete.filter(x => !activeDispatchedIds.includes(x));
+        }
+
+        this.logger.debug(`Marked ${activityIdsToDelete.length} Activities created, by Delayed, for deletion (${rawActCount} w/o Events | ${activeActCount} used by other Delayed Activities)`, {leaf: 'Delayed Activities'});
+
+        if(actualDispatchedIds.length > 0) {
+            await this.dispatchedActivityRepo.delete(actualDispatchedIds);
+        } else {
+            this.logger.warn('No dispatched ids found to delete');
+        }
+        if(activityIdsToDelete.length > 0) {
+            await this.activityRepo.delete(activityIdsToDelete);
+        }
+        this.delayedItems = this.delayedItems.filter(x => !actualDispatchedIds.includes(x.id));
     }
 
     async initStats() {

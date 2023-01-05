@@ -975,7 +975,7 @@ export class Manager extends EventEmitter implements RunningStates {
         let shouldPersistReports = false;
 
         if (existingEntity === null) {
-            activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity, lastKnownStateTimestamp);
+            activityEntity = await Activity.fromSnoowrapActivity(activity, {lastKnownStateTimestamp, db: this.resources.database});
             // always persist if activity is not already persisted and any reports exist
             if (item.num_reports > 0) {
                 shouldPersistReports = true;
@@ -1189,7 +1189,7 @@ export class Manager extends EventEmitter implements RunningStates {
                                     // @ts-ignore
                                     const subProxy = await this.client.getSubmission((item as Comment).link_id);
                                     const sub = await this.resources.getActivity(subProxy);
-                                    subActivity = await this.activityRepo.save(Activity.fromSnoowrapActivity(this.managerEntity.subreddit, sub));
+                                    subActivity = await this.activityRepo.save(await Activity.fromSnoowrapActivity(sub, {db: this.resources.database}));
                                 }
                                 event.activity.submission = subActivity;
 
