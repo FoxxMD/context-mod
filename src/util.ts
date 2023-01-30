@@ -46,7 +46,14 @@ import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
-import {isRateLimitError, isRequestError, isScopeError, isStatusError, SimpleError} from "./Utils/Errors";
+import {
+    isRateLimitError,
+    isRequestError,
+    isScopeError,
+    isSeriousError,
+    isStatusError,
+    SimpleError
+} from "./Utils/Errors";
 import merge from "deepmerge";
 import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
@@ -1096,16 +1103,22 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
             // if it's a request error but not a known "oh probably just a reddit blip" status code treat it as other, which should usually have a lower retry max
         }
 
-        // linear backoff
-        otherRetryCount++;
+        let prefix = '';
+        if(isSeriousError(err)) {
+            // linear backoff
+            otherRetryCount++;
+        } else {
+            prefix = 'NON-SERIOUS ';
+        }
+
         let msg = redditApiError ? `Error occurred while making a request to Reddit (${otherRetryCount}/${maxOtherRetry} in ${clearRetryCountAfter} minutes) but it was NOT a well-known "reddit blip" error.` : `Non-request error occurred (${otherRetryCount}/${maxOtherRetry} in ${clearRetryCountAfter} minutes).`;
         if (maxOtherRetry < otherRetryCount) {
-            logger.warn(`${msg} Exceeded max allowed.`);
+            logger.warn(`${prefix}${msg} Exceeded max allowed.`);
             return false;
         }
         if(waitOnRetry) {
             const ms = (4 * 1000) * otherRetryCount;
-            logger.warn(`${msg} Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+            logger.warn(`${prefix}${msg} Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
             await sleep(ms);
         }
         return true;
