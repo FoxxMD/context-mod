@@ -56,7 +56,7 @@ import {
 } from "../util";
 import {
     ActivityDispatch,
-    CacheConfig,
+    CacheConfig, CacheOptions,
     Footer,
     HistoricalStatsDisplay,
     ResourceStats, StrongTTLConfig,
@@ -161,7 +161,7 @@ import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {ActivitySource} from "../Common/ActivitySource";
 import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
 import {SubredditStats} from "./Stats";
-import {CMCache} from "../Common/Cache";
+import {CMCache, createCacheManager} from "../Common/Cache";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -187,6 +187,7 @@ export class SubredditResources {
     database: DataSource
     client: ExtendedSnoowrap
     cache: CMCache
+    memoryCache: CMCache
     cacheSettingsHash?: string;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
@@ -244,6 +245,12 @@ export class SubredditResources {
         }
         this.cache = cache;
         this.cache.setLogger(this.logger);
+        const memoryCacheOpts: CacheOptions = {
+            store: 'memory',
+            max: 10,
+            ttl: 10
+        };
+        this.memoryCache = new CMCache(createCacheManager(memoryCacheOpts), memoryCacheOpts, false, undefined, {}, this.logger);
 
         this.subredditStats = new SubredditStats(database, managerEntity, cache, statFrequency, this.logger);
 
@@ -1080,6 +1087,9 @@ export class SubredditResources {
 
     async getActivities(user: RedditUser, options: ActivityWindowCriteria, listingData: NamedListing, prefetchedActivities: SnoowrapActivity[] = []): Promise<FetchedActivitiesResult> {
 
+        let cacheKey: string | undefined;
+        let fromCache = false;
+
         try {
 
             let pre: SnoowrapActivity[] = [];
@@ -1087,7 +1097,6 @@ export class SubredditResources {
             let apiCount = 1;
             let preMaxTrigger: undefined | string;
             let rawCount: number = 0;
-            let fromCache = false;
 
             const hashObj = cloneDeep(options);
 
@@ -1100,13 +1109,23 @@ export class SubredditResources {
             const userName = getActivityAuthorName(user);
 
             const hash = objectHash.sha1(hashObj);
-            const cacheKey = `${userName}-${listingData.name}-${hash}`;
+            cacheKey = `${userName}-${listingData.name}-${hash}`;
 
             if (this.ttl.authorTTL !== false) {
                 if (this.useSubredditAuthorCache) {
                     hashObj.subreddit = this.subreddit;
                 }
 
+                // check for cached request error!
+                //
+                // we cache reddit API request errors for 403/404 (suspended/shadowban) in memory so that
+                // we don't waste API calls making the same call repetitively since we know what the result will always be
+                const cachedRequestError = await this.memoryCache.get(cacheKey) as undefined | null | Error;
+                if(cachedRequestError !== undefined && cachedRequestError !== null) {
+                    fromCache = true;
+                    this.logger.debug(`In-memory cache found reddit request error for key ${cacheKey}. Must have been <5 sec ago. Throwing to save API calls!`);
+                    throw cachedRequestError;
+                }
                 const cacheVal = await this.cache.get(cacheKey);
 
                 if(cacheVal === undefined || cacheVal === null) {
@@ -1343,9 +1362,14 @@ export class SubredditResources {
         } catch (err: any) {
             if(isStatusError(err)) {
                 switch(err.statusCode) {
-                    case 404:
-                        throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.', {isSerious: false});
                     case 403:
+                    case 404:
+                        if(!fromCache && cacheKey !== undefined) {
+                            await this.memoryCache.set(cacheKey, err, {ttl: 5});
+                        }
+                        if(err.statusCode === 404) {
+                            throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.', {isSerious: false});
+                        }
                         throw new MaybeSeriousErrorWithCause('Reddit returned a 403 for user history, likely this user is suspended.', {cause: err, isSerious: false});
                     default:
                         throw err;
