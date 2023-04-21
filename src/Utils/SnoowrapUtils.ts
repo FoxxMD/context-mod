@@ -100,6 +100,7 @@ export const renderContent = async (template: string, data: TemplateContext = {}
             conditional.spoiler = activity.spoiler;
             conditional.op = true;
             conditional.upvoteRatio = `${activity.upvote_ratio * 100}%`;
+            conditional.link_flair_text = activity.link_flair_text;
         } else {
             conditional.op = activity.is_submitter;
         }
@@ -122,6 +123,7 @@ export const renderContent = async (template: string, data: TemplateContext = {}
             author.commentKarma = auth.comment_karma;
             author.totalKarma = auth.comment_karma + auth.link_karma;
             author.verified = auth.has_verified_email;
+            author.flairText = activity.author_flair_text;
         }
 
         const templateData: any = {

@@ -61,13 +61,14 @@ All Actions with `content` have access to this data:
 
 Additionally, `author` has these properties accessible:
 
-|      Name      |             Description             | Example  |
-|----------------|-------------------------------------|----------|
-| `age`          | (Approximate) Age of account        | 3 months |
-| `linkKarma`    | Amount of link karma                | 10       |
-| `commentKarma` | Amount of comment karma             | 3        |
-| `totalKarma`   | Combined link+comment karma         | 13       |
-| `verified`     | Does account have a verified email? | true     |
+| Name           | Description                                                                       | Example    |
+|----------------|-----------------------------------------------------------------------------------|------------|
+| `age`          | (Approximate) Age of account                                                      | 3 months   |
+| `linkKarma`    | Amount of link karma                                                              | 10         |
+| `commentKarma` | Amount of comment karma                                                           | 3          |
+| `totalKarma`   | Combined link+comment karma                                                       | 13         |
+| `verified`     | Does account have a verified email?                                               | true       |
+| `flairText`    | The text of the Flair assigned to the Author in this subreddit, if one is present | Test Flair |
 
 NOTE: Accessing these properties may require an additional API call so use sparingly on high-volume comments
 
@@ -84,13 +85,14 @@ Produces:
 
 If the **Activity** is a Submission these additional properties are accessible:
 
-| Name          | Description                                                     | Example                 |
-|---------------|-----------------------------------------------------------------|-------------------------|
-| `upvoteRatio` | The upvote ratio                                                | 100%                    |
-| `nsfw`        | If the submission is marked as NSFW                             | true                    |
-| `spoiler`     | If the submission is marked as a spoiler                        | true                    |
-| `url`         | If the submission was a link then this is the URL for that link | http://example.com      |
-| `title`       | The title of the submission                                     | Test post please ignore |
+| Name              | Description                                                     | Example                 |
+|-------------------|-----------------------------------------------------------------|-------------------------|
+| `upvoteRatio`     | The upvote ratio                                                | 100%                    |
+| `nsfw`            | If the submission is marked as NSFW                             | true                    |
+| `spoiler`         | If the submission is marked as a spoiler                        | true                    |
+| `url`             | If the submission was a link then this is the URL for that link | http://example.com      |
+| `title`           | The title of the submission                                     | Test post please ignore |
+| `link_flair_text` | The flair text assigned to this submission                      | Test Flair              |
 
 ### Comments
 
