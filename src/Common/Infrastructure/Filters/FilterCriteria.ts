@@ -582,6 +582,12 @@ export interface ActivityState {
      * * If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes.
      * */
     authorFlairBackgroundColor?: boolean | string | string[]
+
+    // submission => num_comments
+    // comment => replies[]
+    // but on comments this is only initially hydrated if comments were parsed from a submission
+    // otherwise its EMPTY and we need to make an API call to get them
+    //replies?: CompareValue
 }
 
 /**
@@ -589,6 +595,10 @@ export interface ActivityState {
  * @examples [{"over_18": true, "removed": false}]
  * */
 export interface SubmissionState extends ActivityState {
+
+    // num_comments property
+    replies?: CompareValue
+
     pinned?: boolean
     spoiler?: boolean
     /**

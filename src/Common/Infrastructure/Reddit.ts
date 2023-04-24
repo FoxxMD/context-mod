@@ -166,3 +166,9 @@ export interface RedditRemovalMessageOptions {
     title?: string
     lock?: boolean
 }
+
+export interface ListingMore {
+    count: number
+    children: string[]
+    depth: number
+}

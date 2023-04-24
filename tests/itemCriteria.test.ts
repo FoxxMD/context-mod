@@ -224,6 +224,12 @@ describe('Item Criteria', function () {
             }, snoowrap, false), {depth: '> 1'}, NoopLogger, true)).passed);
         });
 
+        it('Should detect number of replies on Submission', async function () {
+            assert.isTrue((await resource.isItem(new Submission({
+                num_comments: 3,
+            }, snoowrap, false), {depth: '> 1'}, NoopLogger, true)).passed);
+        });
+
         it('Should detect upvote ratio on submission', async function () {
             assert.isTrue((await resource.isItem(new Submission({
                 upvote_ratio: 0.55,

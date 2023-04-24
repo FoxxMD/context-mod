@@ -4,6 +4,7 @@ import {
     activityIsFiltered,
     activityIsRemoved,
     getAuthorHistoryAPIOptions,
+    getNumberOfReplies,
     renderContent,
     TemplateContext
 } from "../Utils/SnoowrapUtils";
@@ -2357,6 +2358,19 @@ export class SubredditResources {
                         const depth = (item as Comment).depth;
                         propResultsMap.depth!.found = depth;
                         propResultsMap.depth!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(depth, depthCompare.operator, depthCompare.value), include);
+                        break;
+                    case 'replies':
+                        if(asComment(item)) {
+                            const repliesError = `Testing for number of replies on a Comment is not currently implemented`;
+                            log.debug(repliesError);
+                            propResultsMap.replies!.passed = false;
+                            propResultsMap.replies!.reason = repliesError;
+                            break;
+                        }
+                        const repliesCompare = parseGenericValueComparison(itemOptVal as string);
+                        const replies = getNumberOfReplies(item);
+                        propResultsMap.replies!.found = replies;
+                        propResultsMap.replies!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(replies, repliesCompare.operator, repliesCompare.value), include);
                         break;
                     case 'upvoteRatio':
                         if(asSubmission(item)) {
