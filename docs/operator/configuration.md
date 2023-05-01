@@ -36,7 +36,7 @@ configuration.
 * **FILE** -- Values specified in a YAML/JSON configuration file using the structure [in the schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
   * When reading the **schema** if the variable is available at a level of configuration other than **FILE** it will be
     noted with the same symbol as above. The value shown is the default.
-* **ARG** -- Values specified as CLI arguments to the program (see [ClI Usage](#cli-usage) below)
+* **ARG** -- Values specified as CLI arguments to the program (see [CLI Usage](#cli-usage) below)
 
 ## File Configuration (Recommended)
 
