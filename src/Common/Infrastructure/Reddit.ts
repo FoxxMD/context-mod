@@ -1,4 +1,5 @@
 import {Comment, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
+import { BannedUser } from "snoowrap/dist/objects/Subreddit";
 import { ValueOf } from "ts-essentials";
 import {CMError} from "../../Utils/Errors";
 
@@ -165,4 +166,15 @@ export const cmToRedditRemovalReason = (cmType: CMRemovalMessageType): RedditRem
 export interface RedditRemovalMessageOptions {
     title?: string
     lock?: boolean
+}
+
+export interface CMBannedUser extends SnoowrapBannedUser {
+    user: RedditUser
+}
+
+export interface SnoowrapBannedUser extends Omit<BannedUser, 'id'> {
+    days_left: number | null
+    rel_id?: string
+
+    id?: string
 }

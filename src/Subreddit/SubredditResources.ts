@@ -136,9 +136,9 @@ import {Duration} from "dayjs/plugin/duration";
 import {
     ActivityType,
     AuthorHistorySort,
-    CachedFetchedActivitiesResult,
+    CachedFetchedActivitiesResult, CMBannedUser,
     FetchedActivitiesResult, MaybeActivityType, RedditUserLike,
-    SnoowrapActivity,
+    SnoowrapActivity, SnoowrapBannedUser,
     SubredditLike,
     SubredditRemovalReason
 } from "../Common/Infrastructure/Reddit";
@@ -162,6 +162,7 @@ import {ActivitySource} from "../Common/ActivitySource";
 import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInterfaces";
 import {SubredditStats} from "./Stats";
 import {CMCache, createCacheManager} from "../Common/Cache";
+import {BannedUser, BanOptions} from "snoowrap/dist/objects/Subreddit";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -865,6 +866,47 @@ export class SubredditResources {
                     await this.cache.set(hash, cacheContributors.filter(x => x !== user.name), {ttl: this.ttl.subredditTTL});
                 }
             }
+        }
+    }
+
+    async getSubredditBannedUser(val: string | RedditUser): Promise<CMBannedUser | undefined> {
+        const subName = this.subreddit.display_name;
+        const name = getActivityAuthorName(val);
+        const hash = `sub-${subName}-banned-${name}`;
+
+        if (this.ttl.authorTTL !== false) {
+            const cachedBanData = (await this.cache.get(hash)) as undefined | null | false | SnoowrapBannedUser;
+            if (cachedBanData !== undefined && cachedBanData !== null) {
+                this.logger.debug(`Cache Hit: Subreddit Banned User ${subName} ${name}`);
+                if(cachedBanData === false) {
+                    return undefined;
+                }
+                return {...cachedBanData, user: new RedditUser({name: cachedBanData.name}, this.client, false)};
+            }
+        }
+
+        let bannedUsers = await this.subreddit.getBannedUsers({name});
+        let bannedUser: CMBannedUser | undefined;
+        if(bannedUsers.length > 0) {
+            const banData = bannedUsers[0] as SnoowrapBannedUser;
+            bannedUser = {...banData,  user: new RedditUser({name: banData.name}, this.client, false)};
+        }
+
+        if (this.ttl.authorTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, bannedUsers.length > 0 ? bannedUsers[0] as SnoowrapBannedUser : false, {ttl: this.ttl.subredditTTL});
+        }
+
+        return bannedUser;
+    }
+
+    async addUserToSubredditBannedUserCache(data: BanOptions) {
+        if (this.ttl.authorTTL !== false) {
+            const subName = this.subreddit.display_name;
+            const name = getActivityAuthorName(data.name);
+            const hash = `sub-${subName}-banned-${name}`;
+            const banData: SnoowrapBannedUser = {date: dayjs().unix(), name: data.name, days_left: data.duration ?? null, note: data.banNote ?? ''};
+            await this.cache.set(hash, banData, {ttl: this.ttl.authorTTL})
         }
     }
 

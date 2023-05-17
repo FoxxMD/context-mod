@@ -67,13 +67,15 @@ export class BanAction extends Action {
             // @ts-ignore
             const fetchedSub = await item.subreddit.fetch();
             const fetchedName = await item.author.name;
-            const bannedUser = await fetchedSub.banUser({
+            const banData = {
                 name: fetchedName,
                 banMessage: renderedContent === undefined ? undefined : renderedContent,
                 banReason: renderedReason,
                 banNote: renderedNote,
                 duration: this.duration
-            });
+            };
+            const bannedUser = await fetchedSub.banUser(banData);
+            await this.resources.addUserToSubredditBannedUserCache(banData)
             touchedEntities.push(bannedUser);
         }
         return {
