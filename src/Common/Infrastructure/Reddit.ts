@@ -2,6 +2,8 @@ import {Comment, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects"
 import { BannedUser } from "snoowrap/dist/objects/Subreddit";
 import { ValueOf } from "ts-essentials";
 import {CMError} from "../../Utils/Errors";
+import {Dayjs} from "dayjs";
+import {Duration} from "dayjs/plugin/duration.js";
 
 export type ActivityType = 'submission' | 'comment';
 export type MaybeActivityType = ActivityType | false;
@@ -168,8 +170,10 @@ export interface RedditRemovalMessageOptions {
     lock?: boolean
 }
 
-export interface CMBannedUser extends SnoowrapBannedUser {
+export interface CMBannedUser extends Omit<SnoowrapBannedUser, 'days_left' | 'date'> {
     user: RedditUser
+    date: Dayjs
+    days_left: undefined | Duration
 }
 
 export interface SnoowrapBannedUser extends Omit<BannedUser, 'id'> {

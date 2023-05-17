@@ -289,7 +289,57 @@ export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria =>
     }, {});
 }
 
-export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'modActions', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor'];
+export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'modActions', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor', 'banned'];
+
+export interface BanCriteria {
+    /**
+     * Test when the Author was banned against this comparison
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number> <unit>`
+     *
+     * * EX `> 100 days` => Passes if Author was banned more than 100 days ago
+     * * EX `<= 2 months` => Passes if Author was banned less than or equal to 2 months ago
+     *
+     * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
+     *
+     * [See] https://regexr.com/609n8 for example
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
+     * */
+    bannedAt?: DurationComparor
+
+    /**
+     * A string or list of strings to match ban note against.
+     *
+     * If a list then ANY matched string makes this pass.
+     *
+     * String may be a regular expression enclosed in forward slashes. If it is not a regular expression then it is matched case-insensitive.
+     * */
+    note?: string | string[]
+
+    /**
+     * Test how many days are left for Author's ban against this comparison
+     *
+     * If the ban is permanent then the number of days left is equivalent to **INFINITY**
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number> <unit>`
+     *
+     * * EX `> 100 days` => Passes if the Author's ban has more than 100 days left
+     * * EX `<= 2 months` => Passes if Author's ban has equal to or less than 2 months left
+     *
+     * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
+     *
+     * [See] https://regexr.com/609n8 for example
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
+     * */
+    daysLeft?: DurationComparor
+
+    /**
+     * Is the ban permanent?
+     * */
+    permanent?: boolean
+}
 
 /**
  * Criteria with which to test against the author of an Activity. The outcome of the test is based on:
@@ -428,6 +478,19 @@ export interface AuthorCriteria {
      * Is the author an approved user (contributor)?
      * */
     isContributor?: boolean
+
+    /**
+     * Is the Author banned or not?
+     *
+     * If user is not banned but BanCriteria(s) is present the test will fail
+     *
+     * * Use a boolean true/false for a simple yes or no
+     * * Or use a BanCriteria to test for specifics of an existing ban
+     * * Or use a list of BanCriteria -- if ANY BanCriteria passes the test passes
+     *
+     * NOTE: USE WITH CARE! This criteria usually incurs 1 API call
+     * */
+    banned?: boolean | BanCriteria | BanCriteria[]
 }
 
 /**
@@ -455,6 +518,7 @@ export const orderedAuthorCriteriaProps: (keyof AuthorCriteria)[] = [
     'isMod', // requires fetching mods for subreddit
     'isContributor', // requires fetching contributors for subreddit
     'modActions', // requires fetching mod notes/actions for author (shortest cache TTL)
+    'banned', // requires fetching /about/banned for every user not cached
 ];
 
 export interface ActivityState {

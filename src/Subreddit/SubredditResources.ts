@@ -29,7 +29,7 @@ import {
     generateFullWikiUrl,
     generateItemFilterHelpers,
     getActivityAuthorName,
-    getActivitySubredditName,
+    getActivitySubredditName, humanizeBanDetails,
     isComment,
     isCommentState,
     isRuleSetResult,
@@ -88,7 +88,7 @@ import cloneDeep from "lodash/cloneDeep";
 import {
     asModLogCriteria,
     asModNoteCriteria,
-    AuthorCriteria,
+    AuthorCriteria, BanCriteria,
     cmToSnoowrapActivityMap, cmToSnoowrapAuthorMap,
     CommentState,
     ModLogCriteria,
@@ -163,6 +163,7 @@ import {SubredditResourceOptions} from "../Common/Subreddit/SubredditResourceInt
 import {SubredditStats} from "./Stats";
 import {CMCache, createCacheManager} from "../Common/Cache";
 import {BannedUser, BanOptions} from "snoowrap/dist/objects/Subreddit";
+import {testBanCriteria} from "../Utils/Criteria/AuthorCritUtils";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -881,7 +882,7 @@ export class SubredditResources {
                 if(cachedBanData === false) {
                     return undefined;
                 }
-                return {...cachedBanData, user: new RedditUser({name: cachedBanData.name}, this.client, false)};
+                return {...cachedBanData, date: dayjs.unix(cachedBanData.date), days_left: cachedBanData.days_left === null ? undefined : dayjs.duration({days: cachedBanData.days_left}), user: new RedditUser({name: cachedBanData.name}, this.client, false)};
             }
         }
 
@@ -889,7 +890,7 @@ export class SubredditResources {
         let bannedUser: CMBannedUser | undefined;
         if(bannedUsers.length > 0) {
             const banData = bannedUsers[0] as SnoowrapBannedUser;
-            bannedUser = {...banData,  user: new RedditUser({name: banData.name}, this.client, false)};
+            bannedUser = {...banData, date: dayjs.unix(banData.date), days_left: banData.days_left === null ? undefined : dayjs.duration({days: banData.days_left}),  user: new RedditUser({name: banData.name}, this.client, false)};
         }
 
         if (this.ttl.authorTTL !== false) {
@@ -2784,6 +2785,33 @@ export class SubredditResources {
                             propResultsMap.verified!.found = verified;
                             propResultsMap.verified!.passed = criteriaPassWithIncludeBehavior(vMatch, include);
                             if (!propResultsMap.verified!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'banned':
+                            const banDetails = await this.getSubredditBannedUser(item.author);
+                            const isBanned = banDetails !== undefined;
+                            propResultsMap.banned!.found = humanizeBanDetails(banDetails);
+
+                            if(typeof authorOpts.banned === 'boolean') {
+                                propResultsMap.banned!.passed = criteriaPassWithIncludeBehavior(isBanned === authorOpts.banned, include);
+                            } else if(!isBanned) {
+                                // since banned criteria is not boolean it must be criteria(s)
+                                // and if user is not banned then no criteria will pass
+                                propResultsMap.banned!.passed = criteriaPassWithIncludeBehavior(false, include);
+                            } else {
+                                const bCritVal = authorOpts.banned as BanCriteria | BanCriteria[];
+                                const bCritArr = !Array.isArray(bCritVal) ? [bCritVal] : bCritVal;
+                                let anyBanCritPassed = false;
+                                for(const bCrit of bCritArr) {
+                                    anyBanCritPassed = testBanCriteria(bCrit, banDetails);
+                                    if(anyBanCritPassed) {
+                                        break;
+                                    }
+                                }
+                                propResultsMap.banned!.passed = criteriaPassWithIncludeBehavior(anyBanCritPassed, include);
+                            }
+                            if (!propResultsMap.banned!.passed) {
                                 shouldContinue = false;
                             }
                             break;

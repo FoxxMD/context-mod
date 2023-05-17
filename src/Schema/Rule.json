@@ -432,10 +432,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -462,6 +462,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -479,6 +485,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -502,6 +511,15 @@
                 "itemIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -522,6 +540,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -569,6 +590,23 @@
                     "description": "Test the age of the Author's account (when it was created) against this comparison\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>`\n\n* EX `> 100 days` => Passes if Author's account is older than 100 days\n* EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\\s*$",
                     "type": "string"
+                },
+                "banned": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/BanCriteria"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/BanCriteria"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Is the Author banned or not?\n\nIf user is not banned but BanCriteria(s) is present the test will fail\n\n* Use a boolean true/false for a simple yes or no\n* Or use a BanCriteria to test for specifics of an existing ban\n* Or use a list of BanCriteria -- if ANY BanCriteria passes the test passes\n\nNOTE: USE WITH CARE! This criteria usually incurs 1 API call"
                 },
                 "commentKarma": {
                     "description": "A string containing a comparison operator and a value to compare karma against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 comment karma\n* EX `<= 75%` => comment karma is less than or equal to 75% of **all karma**",
@@ -735,6 +773,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -752,6 +796,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -787,6 +834,15 @@
                 "itemIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -807,6 +863,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -830,6 +889,39 @@
             "required": [
                 "kind"
             ],
+            "type": "object"
+        },
+        "BanCriteria": {
+            "properties": {
+                "bannedAt": {
+                    "description": "Test when the Author was banned against this comparison\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>`\n\n* EX `> 100 days` => Passes if Author was banned more than 100 days ago\n* EX `<= 2 months` => Passes if Author was banned less than or equal to 2 months ago\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\\s*$",
+                    "type": "string"
+                },
+                "daysLeft": {
+                    "description": "Test how many days are left for Author's ban against this comparison\n\nIf the ban is permanent then the number of days left is equivalent to **INFINITY**\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>`\n\n* EX `> 100 days` => Passes if the Author's ban has more than 100 days left\n* EX `<= 2 months` => Passes if Author's ban has equal to or less than 2 months left\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\\s*$",
+                    "type": "string"
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A string or list of strings to match ban note against.\n\nIf a list then ANY matched string makes this pass.\n\nString may be a regular expression enclosed in forward slashes. If it is not a regular expression then it is matched case-insensitive."
+                },
+                "permanent": {
+                    "description": "Is the ban permanent?",
+                    "type": "boolean"
+                }
+            },
             "type": "object"
         },
         "CommentState": {
@@ -1526,10 +1618,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -1580,10 +1672,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -1630,10 +1722,10 @@
                         "window": {
                             "anyOf": [
                                 {
-                                    "$ref": "#/definitions/DurationObject"
+                                    "$ref": "#/definitions/FullActivityWindowConfig"
                                 },
                                 {
-                                    "$ref": "#/definitions/FullActivityWindowConfig"
+                                    "$ref": "#/definitions/DurationObject"
                                 },
                                 {
                                     "type": [
@@ -1667,10 +1759,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -1721,6 +1813,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -1738,6 +1836,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -1809,6 +1910,15 @@
                 "itemIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -1829,6 +1939,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -2000,6 +2113,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -2017,6 +2136,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -2031,6 +2153,15 @@
                 },
                 "itemIs": {
                     "anyOf": [
+                        {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
                         {
                             "items": {
                                 "anyOf": [
@@ -2052,6 +2183,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -2558,6 +2692,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -2575,6 +2715,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -2585,6 +2728,15 @@
                 },
                 "itemIs": {
                     "anyOf": [
+                        {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
                         {
                             "items": {
                                 "anyOf": [
@@ -2606,6 +2758,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -2657,10 +2812,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -2802,10 +2957,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -2831,6 +2986,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -2848,6 +3009,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -2878,6 +3042,15 @@
                 "itemIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -2898,6 +3071,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -2933,6 +3109,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -2950,6 +3132,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -3014,6 +3199,15 @@
                 "itemIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -3034,6 +3228,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -3097,10 +3294,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -3232,10 +3429,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -3258,6 +3455,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -3275,6 +3478,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -3305,6 +3511,15 @@
                 "itemIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -3325,6 +3540,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -3435,10 +3653,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
-                            "$ref": "#/definitions/FullActivityWindowConfig"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -3464,6 +3682,12 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/AuthorCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -3481,6 +3705,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
@@ -3510,6 +3737,15 @@
                 "itemIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        },
+                        {
+                            "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -3530,6 +3766,9 @@
                         },
                         {
                             "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        },
+                        {
+                            "type": "string"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"

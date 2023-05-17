@@ -111,7 +111,7 @@ import {
 } from "./Common/Infrastructure/Filters/FilterShapes";
 import {
     ActivityType,
-    AuthorHistoryType,
+    AuthorHistoryType, CMBannedUser,
     FullNameTypes,
     PermalinkRedditThings,
     RedditThing,
@@ -3115,4 +3115,16 @@ export const toPollOn = (val: string | PollOn): PollOn => {
         return pVal;
     }
     throw new SimpleError(`'${val}' is not a valid polling source. Valid sources: ${pollOnTypes.join(' | ')}`);
+}
+
+export const humanizeBanDetails = (banDetails: CMBannedUser | undefined): string => {
+    if(banDetails === undefined) {
+        return 'Not Banned';
+    }
+    const timeSinceBan = dayjs.duration(dayjs().diff(banDetails.date)).humanize(true);
+    if(banDetails.days_left === undefined) {
+        return `Banned permanently ${timeSinceBan}`;
+    }
+
+    return `Banned ${timeSinceBan} with ${banDetails.days_left?.days()} days left`;
 }
