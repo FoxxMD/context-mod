@@ -1287,7 +1287,7 @@ export class SubredditResources {
                     }
                     preFilteredPrefetchedActivities = await this.filterListingWithHistoryOptions(preFilteredPrefetchedActivities, user, options.filterOn?.pre);
                 }
-                let unFilteredItems: SnoowrapActivity[] | undefined = [...preFilteredPrefetchedActivities];
+                let unFilteredItems: SnoowrapActivity[] | undefined = undefined;
                 pre = pre.concat(preFilteredPrefetchedActivities);
 
                 const { func: listingFunc } = listingData;
@@ -1346,7 +1346,7 @@ export class SubredditResources {
 
                     if(satisfiedPreEndtime !== undefined || satisfiedPreCount !== undefined) {
                         if(unFilteredItems === undefined) {
-                            unFilteredItems = [];
+                            unFilteredItems = [...preFilteredPrefetchedActivities];
                         }
                         // window has pre filtering, need to check if fallback max would be hit
                         if(satisfiedPreEndtime !== undefined) {
