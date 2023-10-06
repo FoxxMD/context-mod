@@ -54,8 +54,18 @@ export class UserNoteAction extends Action {
             // nothing to do!
             noteCheckResult = 'existingNoteCheck=false so no existing note checks were performed.';
         } else {
+            const contextualCheck = {...this.existingNoteCheck};
+            let contextualNotes: string[] | undefined = undefined;
+            if(this.existingNoteCheck.note !== undefined && this.existingNoteCheck.note !== null) {
+                contextualNotes = [];
+                const notes = Array.isArray(this.existingNoteCheck.note) ? this.existingNoteCheck.note : [this.existingNoteCheck.note];
+                for(const n of notes) {
+                    contextualNotes.push((await this.renderContent(n, item, ruleResults, actionResults) as string))
+                }
+                contextualCheck.note = contextualNotes;
+            }
             const noteCheckCriteriaResult = await this.resources.isAuthor(item, {
-                userNotes: [this.existingNoteCheck]
+                userNotes: [contextualCheck]
             });
             noteCheckPassed = noteCheckCriteriaResult.passed;
             const {details} = buildFilterCriteriaSummary(noteCheckCriteriaResult);

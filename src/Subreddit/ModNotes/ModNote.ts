@@ -167,7 +167,15 @@ export class ModNote {
             if (referenceItem === undefined) {
                 throw new CMError('Criteria wants to check if mod note references activity but not activity was given.');
             }
-            const isCurrentActivity = this.action.actedOn !== undefined && referenceItem !== undefined && this.action.actedOn.name === referenceItem.name;
+            let isCurrentActivity = false;
+            if(referenceItem !== undefined) {
+                if(this.action.actedOn !== undefined) {
+                    isCurrentActivity = this.action.actedOn.name === referenceItem.name;
+                }
+                if(isCurrentActivity === false && this.note !== undefined && this.note.actedOn !== undefined) {
+                    isCurrentActivity = this.note.actedOn.name === referenceItem.name;
+                }
+            }
             if ((referencesCurrentActivity === true && !isCurrentActivity) || (referencesCurrentActivity === false && isCurrentActivity)) {
                 return false;
             }

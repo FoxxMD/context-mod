@@ -33,9 +33,19 @@ export class ModUserNote {
     }
 
     toRaw(): ModUserNoteRaw {
+        let id = undefined;
+        if(this.actedOn !== undefined) {
+            if(this.actedOn instanceof Submission) {
+                id = `t3_${this.actedOn.id}`;
+            } else if(this.actedOn instanceof Comment) {
+                id = `t1_${this.actedOn.id}`;
+            } else if(this.actedOn instanceof RedditUser) {
+                id = `t2_${this.actedOn.id}`;
+            }
+        }
         return {
             note: this.note,
-            reddit_id: this.actedOn !== undefined ? this.actedOn.id : undefined,
+            reddit_id: id,
             label: this.label
         }
     }
