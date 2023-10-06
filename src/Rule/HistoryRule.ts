@@ -311,21 +311,24 @@ export class HistoryRule extends Rule {
 
         let criteriaMet = false;
         let failCriteriaResult: string = '';
+
+        const criteriaResultsSummary = criteriaResults.map(x => this.generateResultDataFromCriteria(x, true).result).join(this.condition === 'OR' ? ' OR ' : ' AND ');
+
         if (this.condition === 'OR') {
             criteriaMet = criteriaResults.some(x => x.triggered);
             if(!criteriaMet) {
-                failCriteriaResult = `${FAIL} No criteria was met`;
+                failCriteriaResult = `${FAIL} No criteria was met => ${criteriaResultsSummary}`;
             }
         } else {
             criteriaMet = criteriaResults.every(x => x.triggered);
             if(!criteriaMet) {
                 if(criteriaResults.some(x => x.triggered)) {
                     const met = criteriaResults.filter(x => x.triggered);
-                    failCriteriaResult = `${FAIL} ${met.length} out of ${criteriaResults.length} criteria met but Rule required all be met. Set log level to debug to see individual results`;
+                    failCriteriaResult = `${FAIL} ${met.length} out of ${criteriaResults.length} criteria met but Rule required all be met => ${criteriaResultsSummary}`;
                     const results = criteriaResults.map(x => this.generateResultDataFromCriteria(x, true));
                     this.logger.debug(`\r\n ${results.map(x => x.result).join('\r\n')}`);
                 } else {
-                    failCriteriaResult = `${FAIL} No criteria was met`;
+                    failCriteriaResult = `${FAIL} No criteria was met => ${criteriaResultsSummary}`;
                 }
             }
         }
@@ -335,8 +338,8 @@ export class HistoryRule extends Rule {
             const refCriteriaResults = criteriaResults.find(x => x.triggered);
             const resultData = this.generateResultDataFromCriteria(refCriteriaResults);
 
-            this.logger.verbose(`${PASS} ${resultData.result}`);
-            return Promise.resolve([true, this.getResult(true, resultData)]);
+            this.logger.verbose(`${PASS} ${criteriaResultsSummary}`);
+            return Promise.resolve([true, this.getResult(true, {data: resultData.data, result: criteriaResultsSummary})]);
         } else {
             // log failures for easier debugging
             for(const res of criteriaResults) {
