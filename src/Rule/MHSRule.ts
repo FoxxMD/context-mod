@@ -241,6 +241,8 @@ export class MHSRule extends Rule {
             res = await this.callMHS(content);
             if(res.response.toLowerCase() === 'success') {
                 await this.resources.cache.set(key, res, {ttl: this.resources.ttl.wikiTTL});
+            } else if(res.response.toLowerCase().includes('authentication failure')) {
+                throw new CMError(`MHS Request failed with Authentication failure. You most likely need to generate a new API key.`);
             }
             return res;
         }
